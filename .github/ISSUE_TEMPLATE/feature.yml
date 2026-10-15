@@ -1,0 +1,22 @@
+name: Feature proposal
+description: Propose a change to graph behavior, clients, or documentation.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What work is difficult with Atlas today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the outcome and a concrete example.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and compatibility
+      description: Existing approaches, affected commands or APIs, and any migration needs.

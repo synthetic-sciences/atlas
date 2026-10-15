@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Private Atlas graph engine, CLI, SDK, and unchanged graph UI.",
+  "description": "Research as a graph: engine, API, CLI, SDK, and React graph UI.",
   "scripts": {
     "test:cli": "node --test cli/tests/*.test.mjs",
     "test:ui": "vitest run --config ui/vitest.config.ts",
