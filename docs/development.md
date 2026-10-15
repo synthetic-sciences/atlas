@@ -12,7 +12,8 @@ uv run --project backend atlas-graph --port 8002
 
 Local mode accepts loopback clients and origins. `ATLAS_DATA_DIR` selects its
 data directory, including SQLite and local evidence files; the default is
-`./data`. `ATLAS_LOCAL_TOKEN` replaces the default development token `local`.
+`./data`. The graph server’s local blob backend uses POSIX directory descriptors
+and runs on Linux or macOS. The CLI can also connect to a remote graph server. `ATLAS_LOCAL_TOKEN` replaces the default development token `local`.
 
 `ATLAS_DATABASE_URL` selects PostgreSQL instead of SQLite.
 `ATLAS_DATABASE_SCHEMA` selects a pre-created graph schema, defaulting to
@@ -38,7 +39,9 @@ uv run --project backend uvicorn atlas_graph.hosted:create_app --factory
 
 Configure `ATLAS_MODE=hosted`, `ATLAS_ACCOUNT_URL`, an
 `ATLAS_ACCOUNT_SERVICE_TOKEN` matching Dashboard's `ATLAS_SERVICE_TOKEN`, and
-an Atlas-owned `ATLAS_SIGNING_SECRET`. Supply these through deployment secrets.
+an Atlas-owned `ATLAS_SIGNING_SECRET` of at least 32 characters. Supply these
+through deployment secrets. Hosted Atlas rejects a Supabase service-role key;
+evidence belongs in its own graph volume.
 The account adapter validates each request, including API-key revocation and
 workspace pinning. Atlas stores graph profile fields with synthetic email
 addresses, rather than account emails or credentials.

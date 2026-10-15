@@ -4,7 +4,41 @@ import base64
 import hmac
 import hashlib
 import time
+from urllib.parse import quote
 from atlas_graph import config
+
+
+def blob_url(path: str, ttl: int | None = None) -> str:
+    from atlas_graph.storage.local import path as validate
+
+    path = validate(path)
+    ttl = config.SIGNED_URL_TTL_SECONDS if ttl is None else ttl
+    if type(ttl) is not int or not 1 <= ttl <= config.SIGNED_URL_TTL_SECONDS:
+        raise ValueError("Invalid artifact URL lifetime")
+    now = int(time.time())
+    header = _b64url_encode(b'{"alg":"HS256","typ":"JWT"}')
+    body = _b64url_encode(json.dumps({
+        "kind": "artifact-download-v1", "path": path, "iat": now, "exp": now + ttl,
+    }, separators=(",", ":")).encode())
+    signature = _b64url_encode(hmac.new(
+        config.SUPABASE_JWT_SECRET.encode(), f"{header}.{body}".encode(), hashlib.sha256,
+    ).digest())
+    return f"/api/artifacts/download/{quote(path, safe='/')}?token={header}.{body}.{signature}"
+
+
+def verify_blob(token: str, path: str) -> bool:
+    if len(token) > 16_384:
+        return False
+    payload = verify_signed_token(token)
+    if not isinstance(payload, dict):
+        return False
+    issued, expires = payload.get("iat"), payload.get("exp")
+    return bool(
+        payload.get("kind") == "artifact-download-v1" and payload.get("path") == path
+        and type(issued) is int and type(expires) is int
+        and issued <= time.time() < expires
+        and 0 < expires - issued <= config.SIGNED_URL_TTL_SECONDS
+    )
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -59,7 +93,7 @@ def sign_url(bucket: str, path: str, ttl_seconds: int | None = None) -> str:
     token = f"{header}.{body}.{sig}"
     return (
         f"{config.SUPABASE_URL}/storage/v1/object/sign/"
-        f"{bucket}/{path}?token={token}"
+        f"{quote(bucket, safe='')}/{quote(path, safe='/')}?token={token}"
     )
 
 
