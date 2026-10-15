@@ -46,15 +46,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - name: Verify npm release identity
-        if: inputs.action == 'inspect'
-        id: npm
-        continue-on-error: true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm whoami
       - name: Manage the existing landing deployment
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -66,8 +58,3 @@ jobs:
           name: landing-deployment-state
           path: dist/deployments/
           retention-days: 30
-      - name: Check release credential readiness
-        if: inputs.action == 'inspect'
-        env:
-          NPM_IDENTITY: ${{ steps.npm.outcome }}
-        run: test "$NPM_IDENTITY" = success
