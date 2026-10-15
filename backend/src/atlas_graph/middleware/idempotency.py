@@ -61,7 +61,7 @@ _AUTHORIZATION_SENSITIVE_PREFIXES = ("/api/admin/ascent/",)
 # request; research search retains its own durable, organization-scoped replay
 # after funding resolution.
 _FUNDING_SENSITIVE_PATHS = frozenset(
-    {"/api/cli/usage", "/api/v1/ace", "/api/v1/research/search"}
+    {"/api/cli/usage", "/api/v1/ace", "/api/v1/research/search", "/api/knowledge/search"}
 )
 _FUNDING_SENSITIVE_PREFIXES = ("/api/llm/proxy/",)
 

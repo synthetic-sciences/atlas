@@ -30,6 +30,7 @@ def create_app():
             collaboration=accounts.collaboration_allowed,
             collaboration_label=accounts.collaboration_label,
             repository=accounts.repository,
+            query=accounts.query,
             index=accounts.index_node,
             shutdown=accounts.close,
         )

@@ -17,6 +17,7 @@ class Host:
     collaboration_label: Callable[..., Awaitable[str]] | None = None
     github: Callable[[], object] | None = None
     repository: Callable[..., object] | None = None
+    query: Callable[..., object] | None = None
     index: Callable[..., Awaitable[list[list[float]]]] | None = None
     embeddings: Callable[[], object] | None = None
     billing_errors: Callable[[], tuple[type[Exception], ...]] | None = None

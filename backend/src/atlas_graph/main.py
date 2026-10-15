@@ -14,7 +14,7 @@ from atlas_graph.dependencies import get_current_user, require_local_connection
 from atlas_graph.middleware.idempotency import IdempotencyMiddleware
 from atlas_graph.realtime.websocket_server import manager
 from atlas_graph.runtime import host
-from atlas_graph.routes import artifacts, audit, browse, campaigns, competitions, core, export_import, nodes, runs, semantics, sharing, tags, users
+from atlas_graph.routes import artifacts, audit, browse, campaigns, competitions, core, export_import, knowledge, nodes, runs, semantics, sharing, tags, users
 
 
 @asynccontextmanager
@@ -64,7 +64,7 @@ async def boundaries(request, call_next):
     return response
 
 
-for module in [nodes, tags, sharing, artifacts, audit, export_import, browse, campaigns, competitions, users, runs, semantics]:
+for module in [nodes, tags, sharing, artifacts, audit, export_import, browse, campaigns, competitions, users, runs, semantics, knowledge]:
     app.include_router(module.router)
 app.include_router(core.router, prefix="/api/v1")
 
