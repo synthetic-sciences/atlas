@@ -153,12 +153,17 @@ async def pin(
             if "already exists" in message or "reference already exists" in message:
                 try:
                     existing = await remote.get_ref(f"{owner}/{repo}", target_tag)
+                    expected = target_sha.lower()
+                    actual = (existing.get("object") or {}).get("sha")
+                    if isinstance(actual, str) and len(expected) < len(actual):
+                        commit = await remote.get_commit(f"{owner}/{repo}", target_sha)
+                        expected = commit.get("sha")
                 except github_client.GitHubError:
                     raise HTTPException(
                         status_code=502,
                         detail="Could not verify the existing repository tag",
                     ) from None
-                if existing.get("object", {}).get("sha") != target_sha:
+                if not actual or actual != expected:
                     raise HTTPException(
                         status_code=409,
                         detail="The repository tag already points to a different commit",
