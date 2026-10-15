@@ -1,29 +1,61 @@
 name: Deploy Atlas landing
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: Existing landing project operation
+        type: choice
+        options: [inspect, migrate, preview, production, rollback]
+        default: inspect
+      release_sha:
+        description: Exact CI-green Atlas main commit
+        type: string
+        required: true
 permissions:
   contents: read
+  actions: read
+concurrency:
+  group: atlas-landing-deployment
+  cancel-in-progress: false
 jobs:
-  inspect:
+  landing:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    environment: landing
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      LANDING_ACTION: ${{ inputs.action }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify exact source and successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main -f event=push -f head_sha="$RELEASE_SHA" -f status=success \
+            --jq '.workflow_runs' > /tmp/atlas-landing-ci.json
+          jq -e --arg sha "$RELEASE_SHA" 'any(.[]; .head_sha == $sha and .head_branch == "main" and .event == "push" and .status == "completed" and .conclusion == "success")' /tmp/atlas-landing-ci.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - name: Verify npm release identity
+        if: inputs.action == 'inspect'
         id: npm
         continue-on-error: true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm whoami
-      - name: Inspect the existing landing deployment
+      - name: Manage the existing landing deployment
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -35,6 +67,7 @@ jobs:
           path: dist/deployments/
           retention-days: 30
       - name: Check release credential readiness
+        if: inputs.action == 'inspect'
         env:
           NPM_IDENTITY: ${{ steps.npm.outcome }}
         run: test "$NPM_IDENTITY" = success
