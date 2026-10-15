@@ -1,0 +1,736 @@
+{
+  "commands": [
+    {
+      "name": "access:set",
+      "endpoints": [
+        "PUT /nodes/{node_id}/access-policy"
+      ]
+    },
+    {
+      "name": "access:set-bulk",
+      "endpoints": [
+        "POST /nodes/access-policy/bulk"
+      ]
+    },
+    {
+      "name": "access:show",
+      "endpoints": [
+        "GET /nodes/{node_id}/access-policy"
+      ]
+    },
+    {
+      "name": "access:summaries",
+      "endpoints": [
+        "POST /nodes/access-policy/summaries"
+      ]
+    },
+    {
+      "name": "account:update",
+      "endpoints": [
+        "PATCH /users/me"
+      ]
+    },
+    {
+      "name": "autoresearch",
+      "endpoints": [
+        "LOCAL /autoresearch"
+      ]
+    },
+    {
+      "name": "brief",
+      "endpoints": [
+        "GET /projects/{project_id}/brief"
+      ]
+    },
+    {
+      "name": "competition",
+      "endpoints": [
+        "GET /competitions/{slug}"
+      ]
+    },
+    {
+      "name": "competitions",
+      "endpoints": [
+        "GET /competitions"
+      ]
+    },
+    {
+      "name": "config:list",
+      "endpoints": [
+        "LOCAL /profile"
+      ]
+    },
+    {
+      "name": "config:set",
+      "endpoints": [
+        "LOCAL /profile/{name}"
+      ]
+    },
+    {
+      "name": "config:show",
+      "endpoints": [
+        "LOCAL /profile/{name}"
+      ]
+    },
+    {
+      "name": "config:unset",
+      "endpoints": [
+        "LOCAL /profile/{name}"
+      ]
+    },
+    {
+      "name": "decision:add",
+      "endpoints": [
+        "POST /decisions:add"
+      ]
+    },
+    {
+      "name": "doctor",
+      "endpoints": [
+        "LOCAL /status"
+      ]
+    },
+    {
+      "name": "draft:create",
+      "endpoints": [
+        "POST /nodes"
+      ]
+    },
+    {
+      "name": "draft:derive-hypothesis",
+      "endpoints": [
+        "POST /nodes/{node_id}/stage/backfill/hypothesis"
+      ]
+    },
+    {
+      "name": "draft:derive-insights",
+      "endpoints": [
+        "POST /nodes/{node_id}/stage/backfill/insights"
+      ]
+    },
+    {
+      "name": "draft:lock",
+      "endpoints": [
+        "POST /nodes/{node_id}/stage/lease/acquire"
+      ]
+    },
+    {
+      "name": "draft:renew",
+      "endpoints": [
+        "POST /nodes/{node_id}/stage/lease/heartbeat"
+      ]
+    },
+    {
+      "name": "draft:unlock",
+      "endpoints": [
+        "POST /nodes/{node_id}/stage/lease/release"
+      ]
+    },
+    {
+      "name": "eval:define",
+      "endpoints": [
+        "POST /evals:define"
+      ]
+    },
+    {
+      "name": "evidence:add",
+      "endpoints": [
+        "POST /nodes/{node_id}/artifacts/uploads/prepare"
+      ]
+    },
+    {
+      "name": "evidence:delete",
+      "endpoints": [
+        "DELETE /nodes/{node_id}/artifacts/{artifact_id}"
+      ]
+    },
+    {
+      "name": "evidence:delete-bulk",
+      "endpoints": [
+        "POST /nodes/{node_id}/artifacts/bulk-delete"
+      ]
+    },
+    {
+      "name": "evidence:download",
+      "endpoints": [
+        "GET /blobs"
+      ]
+    },
+    {
+      "name": "evidence:files",
+      "endpoints": [
+        "GET /users/me/files"
+      ]
+    },
+    {
+      "name": "evidence:finalize",
+      "endpoints": [
+        "POST /nodes/{node_id}/artifacts/uploads/finalize"
+      ]
+    },
+    {
+      "name": "evidence:link",
+      "endpoints": [
+        "POST /nodes/{node_id}/remote-artifacts/resolve"
+      ]
+    },
+    {
+      "name": "evidence:list",
+      "endpoints": [
+        "GET /nodes/{node_id}/artifacts"
+      ]
+    },
+    {
+      "name": "evidence:note",
+      "endpoints": [
+        "PATCH /nodes/{node_id}/artifacts/{artifact_id}/note"
+      ]
+    },
+    {
+      "name": "evidence:prepare",
+      "endpoints": [
+        "POST /nodes/{node_id}/artifacts/uploads/prepare"
+      ]
+    },
+    {
+      "name": "evidence:refresh",
+      "endpoints": [
+        "POST /nodes/{node_id}/remote-artifacts/refresh"
+      ]
+    },
+    {
+      "name": "evidence:show",
+      "endpoints": [
+        "GET /nodes/{node_id}/artifacts/{artifact_id}"
+      ]
+    },
+    {
+      "name": "experiment:plan",
+      "endpoints": [
+        "POST /experiments:plan"
+      ]
+    },
+    {
+      "name": "explore",
+      "endpoints": [
+        "GET /explore"
+      ]
+    },
+    {
+      "name": "fork",
+      "endpoints": [
+        "LOCAL /fork"
+      ]
+    },
+    {
+      "name": "github:disconnect",
+      "endpoints": [
+        "DELETE /auth/github/disconnect"
+      ]
+    },
+    {
+      "name": "github:link",
+      "endpoints": [
+        "GET /auth/github/install-url"
+      ]
+    },
+    {
+      "name": "github:reconnect",
+      "endpoints": [
+        "GET /auth/github/install-url"
+      ]
+    },
+    {
+      "name": "github:refresh-repos",
+      "endpoints": [
+        "POST /auth/github/refresh-repos"
+      ]
+    },
+    {
+      "name": "github:set",
+      "endpoints": [
+        "POST /auth/github/pat"
+      ]
+    },
+    {
+      "name": "github:status",
+      "endpoints": [
+        "GET /auth/github/status"
+      ]
+    },
+    {
+      "name": "history:export",
+      "endpoints": [
+        "GET /legacy/history/export.jsonl"
+      ]
+    },
+    {
+      "name": "hypothesis:add",
+      "endpoints": [
+        "POST /hypotheses:add"
+      ]
+    },
+    {
+      "name": "hypothesis:update",
+      "endpoints": [
+        "POST /hypotheses:update"
+      ]
+    },
+    {
+      "name": "init",
+      "endpoints": [
+        "LOCAL /init"
+      ]
+    },
+    {
+      "name": "integration:huggingface:remove",
+      "endpoints": [
+        "DELETE /auth/integrations/huggingface"
+      ]
+    },
+    {
+      "name": "integration:huggingface:set",
+      "endpoints": [
+        "PUT /auth/integrations/huggingface"
+      ]
+    },
+    {
+      "name": "integration:status",
+      "endpoints": [
+        "GET /auth/integrations/status"
+      ]
+    },
+    {
+      "name": "integration:wandb:remove",
+      "endpoints": [
+        "DELETE /auth/integrations/wandb"
+      ]
+    },
+    {
+      "name": "integration:wandb:set",
+      "endpoints": [
+        "PUT /auth/integrations/wandb"
+      ]
+    },
+    {
+      "name": "key:create",
+      "endpoints": [
+        "POST /auth/api-keys"
+      ]
+    },
+    {
+      "name": "key:delete",
+      "endpoints": [
+        "DELETE /auth/api-keys/{key_id}"
+      ]
+    },
+    {
+      "name": "key:list",
+      "endpoints": [
+        "GET /auth/api-keys"
+      ]
+    },
+    {
+      "name": "key:rotate",
+      "endpoints": [
+        "POST /auth/api-keys/{key_id}/rotate"
+      ]
+    },
+    {
+      "name": "label:assign",
+      "endpoints": [
+        "PUT /nodes/{node_id}/tags"
+      ]
+    },
+    {
+      "name": "label:create",
+      "endpoints": [
+        "POST /nodes/{root_node_id}/tags"
+      ]
+    },
+    {
+      "name": "label:delete",
+      "endpoints": [
+        "DELETE /nodes/{root_node_id}/tags/{tag_id}"
+      ]
+    },
+    {
+      "name": "label:update",
+      "endpoints": [
+        "PATCH /nodes/{root_node_id}/tags/{tag_id}"
+      ]
+    },
+    {
+      "name": "leaderboard",
+      "endpoints": [
+        "LOCAL /runs:leaderboard"
+      ]
+    },
+    {
+      "name": "link:add",
+      "endpoints": [
+        "POST /nodes/{node_id}/parents/add"
+      ]
+    },
+    {
+      "name": "link:children",
+      "endpoints": [
+        "GET /nodes/{node_id}/children"
+      ]
+    },
+    {
+      "name": "link:parents",
+      "endpoints": [
+        "GET /nodes/{node_id}/parents"
+      ]
+    },
+    {
+      "name": "link:remove",
+      "endpoints": [
+        "POST /nodes/{node_id}/parents/remove"
+      ]
+    },
+    {
+      "name": "log:append",
+      "endpoints": [
+        "LOCAL /research/log"
+      ]
+    },
+    {
+      "name": "log:search",
+      "endpoints": [
+        "POST /research/log/search"
+      ]
+    },
+    {
+      "name": "log:tail",
+      "endpoints": [
+        "GET /research/log"
+      ]
+    },
+    {
+      "name": "login",
+      "endpoints": [
+        "LOCAL /auth/cli/browser/start"
+      ]
+    },
+    {
+      "name": "logout",
+      "endpoints": [
+        "LOCAL /auth/logout"
+      ]
+    },
+    {
+      "name": "map:export",
+      "endpoints": [
+        "POST /export"
+      ]
+    },
+    {
+      "name": "map:import",
+      "endpoints": [
+        "POST /import"
+      ]
+    },
+    {
+      "name": "map:lineage",
+      "endpoints": [
+        "GET /nodes/{node_id}/ancestry"
+      ]
+    },
+    {
+      "name": "map:summary",
+      "endpoints": [
+        "GET /nodes/{node_id}/summary"
+      ]
+    },
+    {
+      "name": "map:summary:export",
+      "endpoints": [
+        "POST /export-summary"
+      ]
+    },
+    {
+      "name": "map:summary:pdf",
+      "endpoints": [
+        "POST /export-summary-pdf"
+      ]
+    },
+    {
+      "name": "map:summary:render-pdf",
+      "endpoints": [
+        "POST /export-summary-render-pdf"
+      ]
+    },
+    {
+      "name": "map:summary:stream",
+      "endpoints": [
+        "POST /export-summary-stream"
+      ]
+    },
+    {
+      "name": "map:tree",
+      "endpoints": [
+        "GET /nodes/{node_id}/tree"
+      ]
+    },
+    {
+      "name": "map:view",
+      "endpoints": [
+        "GET /graph"
+      ]
+    },
+    {
+      "name": "node:branch",
+      "endpoints": [
+        "POST /nodes/{node_id}/branch"
+      ]
+    },
+    {
+      "name": "node:create",
+      "endpoints": [
+        "POST /nodes/commit-new"
+      ]
+    },
+    {
+      "name": "node:delete",
+      "endpoints": [
+        "DELETE /nodes/{node_id}"
+      ]
+    },
+    {
+      "name": "node:delete-bulk",
+      "endpoints": [
+        "POST /nodes/bulk-delete"
+      ]
+    },
+    {
+      "name": "node:files",
+      "endpoints": [
+        "GET /nodes/{node_id}/files"
+      ]
+    },
+    {
+      "name": "node:history",
+      "endpoints": [
+        "GET /nodes/{node_id}/audit"
+      ]
+    },
+    {
+      "name": "node:list",
+      "endpoints": [
+        "GET /nodes"
+      ]
+    },
+    {
+      "name": "node:merge",
+      "endpoints": [
+        "POST /nodes/merge"
+      ]
+    },
+    {
+      "name": "node:resolve",
+      "endpoints": [
+        "GET /nodes/resolve-by-slug"
+      ]
+    },
+    {
+      "name": "node:save",
+      "endpoints": [
+        "POST /nodes/{node_id}/commit"
+      ]
+    },
+    {
+      "name": "node:share",
+      "endpoints": [
+        "LOCAL /nodes/share"
+      ]
+    },
+    {
+      "name": "node:show",
+      "endpoints": [
+        "GET /nodes/{node_id}"
+      ]
+    },
+    {
+      "name": "note:add",
+      "endpoints": [
+        "LOCAL /notes"
+      ]
+    },
+    {
+      "name": "notebook:cell",
+      "endpoints": [
+        "LOCAL /notebook/cell"
+      ]
+    },
+    {
+      "name": "ops:maps:export",
+      "endpoints": [
+        "GET /admin/graphs/{root_node_id}/export"
+      ]
+    },
+    {
+      "name": "ops:maps:export-stream",
+      "endpoints": [
+        "GET /admin/graphs/export-stream"
+      ]
+    },
+    {
+      "name": "ops:maps:list",
+      "endpoints": [
+        "GET /admin/graphs"
+      ]
+    },
+    {
+      "name": "optimize:progress",
+      "endpoints": [
+        "POST /optimize:progress"
+      ]
+    },
+    {
+      "name": "optimize:start",
+      "endpoints": [
+        "LOCAL /optimize:start"
+      ]
+    },
+    {
+      "name": "optimize:status",
+      "endpoints": [
+        "LOCAL /optimize:status"
+      ]
+    },
+    {
+      "name": "optimize:stop",
+      "endpoints": [
+        "LOCAL /optimize:stop"
+      ]
+    },
+    {
+      "name": "optimize:verify",
+      "endpoints": [
+        "LOCAL /optimize:verify"
+      ]
+    },
+    {
+      "name": "program:snapshot",
+      "endpoints": [
+        "GET /nodes/{node_id}/campaign/snapshot"
+      ]
+    },
+    {
+      "name": "project:create",
+      "endpoints": [
+        "LOCAL /projects/create"
+      ]
+    },
+    {
+      "name": "project:list",
+      "endpoints": [
+        "LOCAL /projects"
+      ]
+    },
+    {
+      "name": "project:merge",
+      "endpoints": [
+        "LOCAL /projects/merge"
+      ]
+    },
+    {
+      "name": "repo:capture",
+      "endpoints": [
+        "POST /repos/{node_id}/capture"
+      ]
+    },
+    {
+      "name": "repo:pin",
+      "endpoints": [
+        "POST /repos/{node_id}/pin"
+      ]
+    },
+    {
+      "name": "reproduce",
+      "endpoints": [
+        "LOCAL /reproduce"
+      ]
+    },
+    {
+      "name": "researchers",
+      "endpoints": [
+        "GET /researchers"
+      ]
+    },
+    {
+      "name": "run:chart",
+      "endpoints": [
+        "LOCAL /runs:chart"
+      ]
+    },
+    {
+      "name": "run:compare",
+      "endpoints": [
+        "GET /runs:compare"
+      ]
+    },
+    {
+      "name": "run:record",
+      "endpoints": [
+        "LOCAL /runs:record"
+      ]
+    },
+    {
+      "name": "run:spool:clear",
+      "endpoints": [
+        "LOCAL /runs:spool/clear"
+      ]
+    },
+    {
+      "name": "run:spool:flush",
+      "endpoints": [
+        "LOCAL /runs:spool/flush"
+      ]
+    },
+    {
+      "name": "run:spool:list",
+      "endpoints": [
+        "LOCAL /runs:spool"
+      ]
+    },
+    {
+      "name": "secret:clear",
+      "endpoints": [
+        "LOCAL /auth/keychain"
+      ]
+    },
+    {
+      "name": "secret:set",
+      "endpoints": [
+        "LOCAL /auth/keychain"
+      ]
+    },
+    {
+      "name": "usage:summary",
+      "endpoints": [
+        "GET /usage/summary"
+      ]
+    },
+    {
+      "name": "web:fetch",
+      "endpoints": [
+        "POST /web/fetch"
+      ]
+    },
+    {
+      "name": "web:search",
+      "endpoints": [
+        "POST /web/search"
+      ]
+    },
+    {
+      "name": "whoami",
+      "endpoints": [
+        "GET /auth/status"
+      ]
+    }
+  ]
+}

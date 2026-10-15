@@ -1,0 +1,22 @@
+[
+  "idempotency_keys",
+  "users",
+  "nodes",
+  "node_edges",
+  "project_dedupe_keys",
+  "tags",
+  "tag_assignments",
+  "tag_history",
+  "node_access_rules",
+  "artifacts",
+  "artifact_upload_batches",
+  "audit_events",
+  "knowledge_sources",
+  "knowledge_chunks",
+  "stage_leases",
+  "research_log",
+  "campaign_budgets",
+  "graph_stars",
+  "competitions",
+  "competition_entries"
+]

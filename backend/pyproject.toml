@@ -1,0 +1,33 @@
+[project]
+name = "atlas-graph"
+version = "0.1.0"
+description = "Independent Atlas research graph engine and HTTP contract"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.121.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.10.0",
+  "aiosqlite>=0.20.0",
+  "httpx>=0.27.0",
+  "fpdf2>=2.7.0",
+  "sse-starlette>=2.1.0",
+]
+
+[project.optional-dependencies]
+pg = ["asyncpg>=0.30.0"]
+dev = ["pytest>=8.0.0", "pytest-asyncio>=0.24.0", "pytest-timeout>=2.3.0", "respx>=0.21.1"]
+
+[project.scripts]
+atlas-graph = "atlas_graph.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atlas_graph"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+

@@ -1,0 +1,6 @@
+This private repository contains code extracted from Synthetic Sciences'
+dashboard repository at commit 566904ae1e6157a4157a7469212f800bd026995f.
+Copyright and authorship remain with their original owners.
+
+The compatibility CLI retains its MIT license in cli/LICENSE. This notice does
+not extend that license to the extracted private backend or frontend code.

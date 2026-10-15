@@ -1,0 +1,14 @@
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+!.env.example
+data/
+dist/
+*.egg-info/
+*.tsbuildinfo
+.DS_Store
+
