@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from importlib.resources import files
 import re
+import sqlite3
 
 import aiosqlite
 
@@ -13,6 +14,23 @@ from atlas_graph.db.postgres import PgConnectionWrapper
 from atlas_graph.runtime import host
 
 _pool = None
+MIGRATIONS = ("schema", "index")
+
+
+async def _sqlite_script(db, script: str) -> None:
+    # executescript commits an existing transaction before running. Execute
+    # complete statements ourselves so the migration lock and DDL stay atomic.
+    statement = ""
+    for line in script.splitlines(keepends=True):
+        if not statement and (not line.strip() or line.lstrip().startswith("--")):
+            continue
+        statement += line
+        if sqlite3.complete_statement(statement):
+            cursor = await db.execute(statement)
+            await cursor.close()
+            statement = ""
+    if statement.strip():
+        raise RuntimeError("Incomplete SQLite migration statement")
 
 
 async def init_db() -> None:
@@ -47,13 +65,16 @@ async def init_db() -> None:
                     await connection.execute(
                         "CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)"
                     )
-                    installed = await connection.fetchval(
-                        "SELECT version FROM atlas_schema_versions WHERE version = 1"
-                    )
-                    if installed is None:
+                    for version, name in enumerate(MIGRATIONS, start=1):
+                        installed = await connection.fetchval(
+                            "SELECT version FROM atlas_schema_versions WHERE version=$1",
+                            version,
+                        )
+                        if installed is not None:
+                            continue
                         schema = (
                             files("atlas_graph.db")
-                            .joinpath("schema.pg.sql")
+                            .joinpath(f"{name}.pg.sql")
                             .read_text()
                         )
                         if namespace != "public":
@@ -62,26 +83,35 @@ async def init_db() -> None:
                             ).replace(f'"{namespace}".vector', "public.vector")
                         await connection.execute(schema)
                         await connection.execute(
-                            "INSERT INTO atlas_schema_versions (version) VALUES (1)"
+                            "INSERT INTO atlas_schema_versions (version) VALUES ($1)",
+                            version,
                         )
         except BaseException:
             await close_db()
             raise
         return
-    async with aiosqlite.connect(config.DB_PATH) as db:
+    async with aiosqlite.connect(config.DB_PATH, timeout=15) as db:
         await db.execute("PRAGMA journal_mode = WAL")
         await db.execute("PRAGMA foreign_keys = ON")
-        await db.execute(
-            "CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)"
-        )
-        cursor = await db.execute(
-            "SELECT version FROM atlas_schema_versions WHERE version = 1"
-        )
-        if await cursor.fetchone() is None:
-            schema = files("atlas_graph.db").joinpath("schema.sql").read_text()
-            await db.executescript(schema)
-            await db.execute("INSERT INTO atlas_schema_versions (version) VALUES (1)")
-        await db.commit()
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            await db.execute(
+                "CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)"
+            )
+            for version, name in enumerate(MIGRATIONS, start=1):
+                cursor = await db.execute(
+                    "SELECT version FROM atlas_schema_versions WHERE version=?", (version,)
+                )
+                installed = await cursor.fetchone()
+                await cursor.close()
+                if installed is not None:
+                    continue
+                await _sqlite_script(db, files("atlas_graph.db").joinpath(f"{name}.sql").read_text())
+                await db.execute("INSERT INTO atlas_schema_versions (version) VALUES (?)", (version,))
+            await db.commit()
+        except BaseException:
+            await db.rollback()
+            raise
 
 
 @asynccontextmanager

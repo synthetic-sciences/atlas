@@ -20,12 +20,22 @@ from atlas_graph.routes import artifacts, audit, browse, campaigns, competitions
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     shutdown = host().shutdown
+    indexer = None
     try:
         await init_db()
+        if config.INDEXING_ENABLED:
+            from atlas_graph.services.index_jobs import Indexer
+
+            indexer = Indexer()
+            await indexer.start()
         yield
     finally:
         try:
-            await close_db()
+            try:
+                if indexer is not None:
+                    await indexer.stop()
+            finally:
+                await close_db()
         finally:
             if shutdown is not None:
                 await shutdown()

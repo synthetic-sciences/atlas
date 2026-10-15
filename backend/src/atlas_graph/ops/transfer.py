@@ -11,6 +11,8 @@ from urllib.parse import urlsplit
 
 import asyncpg
 
+from atlas_graph.db.connection import MIGRATIONS
+
 TABLES = (
     "users",
     "competitions",
@@ -100,7 +102,7 @@ async def transfer(
             target_schema,
         )
     }
-    required = {*TABLES, "idempotency_keys", "atlas_schema_versions"}
+    required = {*TABLES, "idempotency_keys", "atlas_schema_versions", "atlas_index_jobs", "atlas_index_leader"}
     if names != required:
         raise ValueError("Target must contain only the initialized graph schema")
     report = {
@@ -128,15 +130,15 @@ async def transfer(
             "LOCK TABLE "
             + ",".join(
                 f'{destination}."{table}"'
-                for table in (*TABLES, "idempotency_keys", "atlas_schema_versions")
+                for table in (*TABLES, "idempotency_keys", "atlas_schema_versions", "atlas_index_jobs", "atlas_index_leader")
             )
             + " IN ACCESS EXCLUSIVE MODE"
         )
         if await target.fetchval(
             f"SELECT array_agg(version ORDER BY version) FROM {destination}.atlas_schema_versions"
-        ) != [1]:
+        ) != list(range(1, len(MIGRATIONS) + 1)):
             raise ValueError("Target must contain only the initialized graph schema")
-        for table in (*TABLES, "idempotency_keys"):
+        for table in (*TABLES, "idempotency_keys", "atlas_index_jobs", "atlas_index_leader"):
             if await target.fetchval(
                 f'SELECT EXISTS (SELECT 1 FROM {destination}."{table}")'
             ):
@@ -221,6 +223,11 @@ async def transfer(
                         maximum is not None,
                     )
         await target.execute(f"ALTER TABLE {destination}.nodes ENABLE TRIGGER USER")
+        report["scheduler"] = {
+            "source": "commit audit",
+            "queued_nodes": await target.fetchval(f"SELECT COUNT(*) FROM {destination}.atlas_index_jobs"),
+            "leases_copied": False,
+        }
     return report
 
 

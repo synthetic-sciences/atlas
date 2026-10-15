@@ -43,6 +43,7 @@ def __getattr__(name: str):
         "DATABASE_URL": database,
         "DATABASE_SCHEMA": os.environ.get("ATLAS_DATABASE_SCHEMA", "public"),
         "USE_POSTGRES": bool(database),
+        "INDEXING_ENABLED": os.environ.get("ATLAS_INDEXING_ENABLED", "false").lower() == "true",
         "PUBLIC_GRAPHS_ENABLED": os.environ.get(
             "ATLAS_PUBLIC_GRAPHS_ENABLED", "false"
         ).lower()
