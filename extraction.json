@@ -1,5 +1,6 @@
 {
-  "source_repository": "synthetic-sciences/atlas",
+  "source_repository": "synthetic-sciences/dashboard",
+  "source_repository_id": "R_kgDOSF8Xug",
   "source_sha": "566904ae1e6157a4157a7469212f800bd026995f",
   "backend_files": [
     "services/node_service.py",

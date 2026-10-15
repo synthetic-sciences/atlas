@@ -81,7 +81,7 @@ async def websocket_endpoint(websocket: WebSocket):
         if config.MODE == "local":
             require_local_connection(websocket)
         data = await asyncio.wait_for(websocket.receive_json(), timeout=10)
-        if data.get("type") != "auth" or not isinstance(data.get("token"), str):
+        if not isinstance(data, dict) or data.get("type") != "auth" or not isinstance(data.get("token"), str):
             await websocket.close(code=4001)
             return
         scope = {**websocket.scope, "type": "http", "method": "GET", "headers": [*[(key,value) for key,value in websocket.scope.get("headers",[]) if key.lower() != b"authorization"], (b"authorization", f"Bearer {data['token']}".encode())]}
@@ -95,6 +95,9 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json({"type": "connected", "user_id": user["user_id"]})
             while True:
                 message = await websocket.receive_json()
+                if not isinstance(message, dict):
+                    await websocket.close(code=4001)
+                    return
                 if message.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
                 if message.get("type") == "subscribe":
@@ -106,6 +109,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "subscribed", "node_id": node_id} if allowed else {"type": "error", "code": "access_denied", "node_id": node_id})
         finally:
             manager.disconnect(websocket, user["user_id"])
-    except (HTTPException, asyncio.TimeoutError, ValueError, WebSocketDisconnect):
+    except WebSocketDisconnect:
+        return
+    except (HTTPException, asyncio.TimeoutError, ValueError):
         await websocket.close(code=4001)
 
