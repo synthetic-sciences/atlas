@@ -2,7 +2,7 @@
 
 ## Reporting
 
-Email **security@syntheticsciences.ai** with a minimal reproduction, the affected
+Email **support@sayntheticsciences.ai** with a minimal reproduction, the affected
 package and version, and the impact. Keep vulnerabilities out of public issues
 and pull requests until a fix and disclosure are coordinated. Do not send live
 credentials, private research data, or account exports; use a redacted example.

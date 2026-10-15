@@ -25,3 +25,8 @@ Landing uses its own Bun lock and React 18, independently of the React 19 UI.
 Release credentials belong in encrypted CI secrets, never source or artifacts.
 Squash merge every pull request after its required checks pass. Do not use
 merge commits or rebase merges.
+
+Company details are InkVell Inc. (dba Synthetic Sciences), copyright 2026.
+The confirmed contact is support@sayntheticsciences.ai, with that exact spelling.
+Do not invent separate security, conduct, careers, or legal contact addresses.
+Preserve third-party authorship and notices.

@@ -2268,7 +2268,7 @@ export default function Landing() {
                     </svg>
                   </a>
                 </li>
-                <li><a href="mailto:team@syntheticsciences.ai" className="link-underline text-foreground/70 hover:text-foreground">Careers</a></li>
+                <li><a href="mailto:support@sayntheticsciences.ai" className="link-underline text-foreground/70 hover:text-foreground">Contact</a></li>
                 <li><a href="https://syntheticsciences.ai/privacy" className="link-underline text-foreground/70 hover:text-foreground" target="_blank" rel="noreferrer">Privacy</a></li>
                 <li><a href="https://syntheticsciences.ai/terms" className="link-underline text-foreground/70 hover:text-foreground" target="_blank" rel="noreferrer">Terms</a></li>
               </ul>
@@ -2276,7 +2276,7 @@ export default function Landing() {
           </div>
 
           <div className="mt-14 pt-6 border-t border-border/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[12.5px] text-foreground/45">
-            <div>&copy; {new Date().getFullYear()} InkVell Inc. Atlas is a Synthetic Sciences product.</div>
+            <div>&copy; 2026 InkVell Inc. (dba Synthetic Sciences).</div>
             <a href="#top" className="link-underline hover:text-foreground inline-flex items-center gap-2">
               Back to top
               <svg width="9" height="11" viewBox="0 0 9 11" aria-hidden>

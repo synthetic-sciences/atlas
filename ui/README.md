@@ -28,3 +28,6 @@ be explicitly enabled by a host. Server permissions remain authoritative.
 Compiled JavaScript and TypeScript declarations are shipped on npm; tests,
 credentials, account implementation, and backend source are excluded.
 Licensed under Apache-2.0.
+
+Copyright 2026 InkVell Inc. (dba Synthetic Sciences).
+Contact: [support@sayntheticsciences.ai](mailto:support@sayntheticsciences.ai).

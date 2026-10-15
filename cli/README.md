@@ -17,3 +17,6 @@ not implement those services.
 
 Source and releases are maintained in Synthetic Sciences' private Atlas
 repository. This npm package is public and licensed under Apache-2.0.
+
+Copyright 2026 InkVell Inc. (dba Synthetic Sciences).
+Contact: [support@sayntheticsciences.ai](mailto:support@sayntheticsciences.ai).
