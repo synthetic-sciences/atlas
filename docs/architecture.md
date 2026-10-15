@@ -8,6 +8,8 @@ one host adapter. Existing URLs, hidden flags, and rendered UI stay compatible.
 `atlas_graph.runtime.Host` supplies database contexts, authentication dependencies,
 collaboration capability, optional GitHub and embedding adapters, and transport
 error mapping. Atlas does not inspect commercial plans or import dashboard code.
+Hosted repository operations use a caller-bound adapter; Dashboard executes
+the GitHub request and returns commit IDs while keeping account grants private.
 `configureAtlasUI` supplies browser request/auth helpers, the host shell and
 feedback components, and an explicit public-discovery flag.
 

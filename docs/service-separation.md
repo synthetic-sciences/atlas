@@ -3,7 +3,8 @@
 Repository extraction is deployed separately from the live service and data
 cutover. Dashboard currently hosts the pinned graph wheel. The standalone
 Atlas service already runs against graph-only SQLite or PostgreSQL; its hosted
-identity and provider integration still needs a two-service rehearsal.
+identity integration passes a two-service PostgreSQL rehearsal. Provider,
+gateway, storage, and writer-cutover contracts remain separate gates.
 
 The hosted entry point is `atlas_graph.hosted:create_app`. Its Dashboard adapter
 calls `/api/internal/atlas/identity` with the incoming bearer and workspace
@@ -19,6 +20,17 @@ HTTPS `ATLAS_ACCOUNT_URL` (loopback HTTP for rehearsal), and its own signing
 secret. This credential grants only the graph account-adapter endpoints; it
 does not authenticate as a user or grant database access. A user credential is
 also required for identity. No account authentication cache survives a request.
+
+Hosted repository capture, pin, and verification use a request-bound repository
+adapter. It forwards only the caller's bearer and workspace header plus the
+service credential to `/api/internal/atlas/repository`. Dashboard revalidates
+the caller and performs the fixed repository status, tag creation, ref read,
+or commit read operation using its account-owned GitHub connection. It returns
+only connection state or commit IDs. Stored OAuth/PAT grants never enter Atlas.
+No user ID supplied by Atlas chooses the GitHub account, and no arbitrary URL,
+method, or request headers can be proxied. Redirects and ambiguous write retries
+are refused. Graph write access is required before pinning; an existing tag
+counts as pinned only when it points to the requested commit.
 
 ## Database permissions
 

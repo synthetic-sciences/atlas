@@ -22,6 +22,7 @@ def create_app():
             optional_auth=accounts.optional_auth,
             collaboration=accounts.collaboration_allowed,
             collaboration_label=accounts.collaboration_label,
+            repository=accounts.repository,
             shutdown=accounts.close,
         )
     )

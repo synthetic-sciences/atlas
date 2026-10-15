@@ -8,8 +8,9 @@ from uuid import UUID
 
 import httpx
 from fastapi import HTTPException, Request
-from pydantic import BaseModel, StrictBool, StrictStr, ValidationError
+from pydantic import BaseModel, Field, StrictBool, StrictStr, ValidationError
 
+from atlas_graph.clients.github_client import GitHubError
 from atlas_graph.db.connection import get_db
 
 
@@ -37,6 +38,76 @@ class Account(BaseModel):
 class Collaboration(BaseModel):
     enabled: StrictBool
     label: StrictStr
+
+
+class Connection(BaseModel):
+    connected: StrictBool
+
+
+class Commit(BaseModel):
+    sha: str = Field(strict=True, pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+
+
+class Ref(BaseModel):
+    object: Commit
+
+
+class Repository:
+    def __init__(self, account: Dashboard, headers: dict[str, str]):
+        self.account = account
+        self.headers = headers
+
+    async def call(self, operation: str, repo: str, **fields: str) -> dict:
+        try:
+            return await self.account.request(
+                "repository",
+                method="POST",
+                headers=self.headers,
+                body={"operation": operation, "repo": repo, **fields},
+            )
+        except HTTPException as error:
+            if (
+                isinstance(error.detail, dict)
+                and error.detail.get("code") == "github_error"
+            ):
+                raise GitHubError(
+                    error.status_code,
+                    error.detail.get("message", "GitHub request failed"),
+                ) from None
+            raise
+
+    async def is_connected(self, repo: str) -> bool:
+        payload = await self.call("status", repo)
+        try:
+            return Connection.model_validate(payload).connected
+        except ValidationError:
+            raise HTTPException(
+                503, detail="Invalid repository service response"
+            ) from None
+
+    async def create_ref(self, repo: str, ref: str, sha: str) -> dict:
+        return self.ref(await self.call("create_ref", repo, ref=ref, sha=sha))
+
+    async def get_ref(self, repo: str, ref: str) -> dict:
+        return self.ref(await self.call("ref", repo, ref=ref))
+
+    async def get_commit(self, repo: str, sha: str) -> dict:
+        payload = await self.call("commit", repo, sha=sha)
+        try:
+            return Commit.model_validate(payload).model_dump()
+        except ValidationError:
+            raise HTTPException(
+                503, detail="Invalid repository service response"
+            ) from None
+
+    @staticmethod
+    def ref(payload: dict) -> dict:
+        try:
+            return Ref.model_validate(payload).model_dump()
+        except ValidationError:
+            raise HTTPException(
+                503, detail="Invalid repository service response"
+            ) from None
 
 
 class Dashboard:
@@ -69,11 +140,20 @@ class Dashboard:
     async def close(self) -> None:
         await self.client.aclose()
 
-    async def request(self, path: str, *, headers: dict | None = None) -> dict:
+    async def request(
+        self,
+        path: str,
+        *,
+        headers: dict | None = None,
+        method: str = "GET",
+        body: dict | None = None,
+    ) -> dict:
         try:
-            response = await self.client.get(
+            response = await self.client.request(
+                method,
                 f"{self.url}/api/internal/atlas/{path}",
                 headers={**(headers or {}), "X-Atlas-Service-Token": self.token},
+                json=body,
                 follow_redirects=False,
             )
         except httpx.HTTPError:
@@ -104,6 +184,13 @@ class Dashboard:
         if not isinstance(payload, dict):
             raise HTTPException(503, detail="Invalid account service response")
         return payload
+
+    def repository(self, request: Request) -> Repository:
+        headers = {"Authorization": request.headers.get("authorization", "")}
+        organization = request.headers.get("x-organization-id")
+        if organization:
+            headers["X-Organization-ID"] = organization
+        return Repository(self, headers)
 
     async def authenticate(self, request: Request) -> dict:
         cached = getattr(request.state, "atlas_account_identity", None)
