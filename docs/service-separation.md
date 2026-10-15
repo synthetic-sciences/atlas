@@ -5,6 +5,21 @@ cutover. Dashboard currently hosts the pinned graph wheel. The standalone
 Atlas service already runs against graph-only SQLite or PostgreSQL; its hosted
 identity and provider integration still needs a two-service rehearsal.
 
+The hosted entry point is `atlas_graph.hosted:create_app`. Its Dashboard adapter
+calls `/api/internal/atlas/identity` with the incoming bearer and workspace
+header plus a graph service credential. It verifies each new request through
+Dashboard, caches identity only within that request, and refreshes a graph-only
+profile cache without account emails or credentials. Redirects are never
+followed with these headers. Collaboration is an explicit Dashboard capability
+lookup, so Atlas does not reconstruct commercial policy.
+
+Dashboard keeps this account boundary disabled until `ATLAS_SERVICE_TOKEN` is
+provisioned. Atlas uses the matching `ATLAS_ACCOUNT_SERVICE_TOKEN`, a fixed
+HTTPS `ATLAS_ACCOUNT_URL` (loopback HTTP for rehearsal), and its own signing
+secret. This credential grants only the graph account-adapter endpoints; it
+does not authenticate as a user or grant database access. A user credential is
+also required for identity. No account authentication cache survives a request.
+
 ## Database permissions
 
 Atlas can use a separate database or a dedicated schema on the existing

@@ -47,6 +47,16 @@ Dashboard tables. A missing or invalid schema fails startup without falling
 back to another schema. See [service separation](docs/service-separation.md)
 for the data rehearsal and the remaining hosted cutover gates.
 
+The Dashboard identity adapter runs through
+`uv run --project backend uvicorn atlas_graph.hosted:create_app --factory`.
+It requires `ATLAS_MODE=hosted`, `ATLAS_ACCOUNT_URL`, an
+`ATLAS_ACCOUNT_SERVICE_TOKEN` matching Dashboard's `ATLAS_SERVICE_TOKEN`,
+and an Atlas-owned `ATLAS_SIGNING_SECRET`. Configure these through deployment
+secrets. Dashboard validates each request, including API-key revocation and
+workspace pinning. Atlas persists only graph profile fields and synthetic
+email addresses. Hosted provider, storage, and gateway cutover gates still
+apply before replacing the embedded production graph service.
+
 ## Checks and releases
 
 ```sh

@@ -19,6 +19,7 @@ class Host:
     embeddings: Callable[[], object] | None = None
     billing_errors: Callable[[], tuple[type[Exception], ...]] | None = None
     errors: Callable | None = None
+    shutdown: Callable[[], Awaitable[None]] | None = None
 
 
 _host = Host()
