@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from importlib.resources import files
+import re
 
 import aiosqlite
 
@@ -23,23 +24,59 @@ async def init_db() -> None:
     if config.USE_POSTGRES:
         import asyncpg
 
+        namespace = config.DATABASE_SCHEMA
+        if not re.fullmatch(r"[a-z_][a-z0-9_]*", namespace):
+            raise RuntimeError("ATLAS_DATABASE_SCHEMA must be a PostgreSQL identifier")
         if _pool is None:
-            _pool = await asyncpg.create_pool(config.DATABASE_URL, min_size=1, max_size=10)
-        async with _pool.acquire() as connection:
-            async with connection.transaction():
-                await connection.execute("SELECT pg_advisory_xact_lock(28048739301404496)")
-                await connection.execute("CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)")
-                installed = await connection.fetchval("SELECT version FROM atlas_schema_versions WHERE version = 1")
-                if installed is None:
-                    schema = files("atlas_graph.db").joinpath("schema.pg.sql").read_text()
-                    await connection.execute(schema)
-                    await connection.execute("INSERT INTO atlas_schema_versions (version) VALUES (1)")
+            _pool = await asyncpg.create_pool(
+                config.DATABASE_URL,
+                min_size=1,
+                max_size=10,
+                server_settings={"search_path": f'"{namespace}", public'},
+            )
+        try:
+            async with _pool.acquire() as connection:
+                if await connection.fetchval("SELECT current_schema()") != namespace:
+                    raise RuntimeError(
+                        "The configured Atlas schema must already exist and be accessible"
+                    )
+                async with connection.transaction():
+                    await connection.execute(
+                        "SELECT pg_advisory_xact_lock(28048739301404496)"
+                    )
+                    await connection.execute(
+                        "CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)"
+                    )
+                    installed = await connection.fetchval(
+                        "SELECT version FROM atlas_schema_versions WHERE version = 1"
+                    )
+                    if installed is None:
+                        schema = (
+                            files("atlas_graph.db")
+                            .joinpath("schema.pg.sql")
+                            .read_text()
+                        )
+                        if namespace != "public":
+                            schema = schema.replace(
+                                "public.", f'"{namespace}".'
+                            ).replace(f'"{namespace}".vector', "public.vector")
+                        await connection.execute(schema)
+                        await connection.execute(
+                            "INSERT INTO atlas_schema_versions (version) VALUES (1)"
+                        )
+        except BaseException:
+            await close_db()
+            raise
         return
     async with aiosqlite.connect(config.DB_PATH) as db:
         await db.execute("PRAGMA journal_mode = WAL")
         await db.execute("PRAGMA foreign_keys = ON")
-        await db.execute("CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)")
-        cursor = await db.execute("SELECT version FROM atlas_schema_versions WHERE version = 1")
+        await db.execute(
+            "CREATE TABLE IF NOT EXISTS atlas_schema_versions (version INTEGER PRIMARY KEY)"
+        )
+        cursor = await db.execute(
+            "SELECT version FROM atlas_schema_versions WHERE version = 1"
+        )
         if await cursor.fetchone() is None:
             schema = files("atlas_graph.db").joinpath("schema.sql").read_text()
             await db.executescript(schema)
@@ -72,4 +109,3 @@ async def close_db() -> None:
     _pool = None
     if pool is not None:
         await pool.close()
-
