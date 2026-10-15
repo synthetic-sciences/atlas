@@ -71,6 +71,10 @@ GRAPH_ROUTERS = [(module, "") for module in (
 for module, prefix in GRAPH_ROUTERS:
     app.include_router(module.router, prefix=prefix)
 
+from atlas_graph.routes.administration import router as administration_router
+
+app.include_router(administration_router)
+
 
 @app.get("/api/health")
 @app.get("/api/health/db")

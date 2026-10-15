@@ -272,3 +272,18 @@ legacy response replay, and the single-writer fence have separate gates.
    deployments and recovery before declaring the migration complete.
 
 No production database or storage changes are performed by the rehearsal tool.
+
+Hosted graph administration uses `ATLAS_ADMIN_SERVICE_TOKEN`, a separate
+credential from account verification, paid indexing, and signed blob links.
+Dashboard retains browser identity, administrator roles, and fresh MFA checks;
+only then may it call the fixed `/api/internal/host/` operations for graph
+statistics, root listing, export, and audit retention. These endpoints are
+absent from the public gateway catalog and disabled in local mode. Atlas
+returns graph IDs/counts and graph content, never account emails or Wallet data.
+Export streams are produced one root at a time. Every call rechecks the service
+credential; generic user idempotency replay cannot bypass this boundary.
+
+Live descendant events include current collaborators and owners of every
+containing graph root, as well as legacy direct rules. Removing an inherited
+rule stops later events; failed ACL lookups suppress the event. Public
+visibility alone does not send every graph mutation to every connected user.

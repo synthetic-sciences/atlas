@@ -52,7 +52,7 @@ _STORABLE_NON_2XX_STATUSES = frozenset({409, 422})
 # mutable authorization. Replaying a stored approved response after revocation
 # would violate the access boundary (and could replay the private artifact URL).
 _AUTHORIZATION_SENSITIVE_PATHS = frozenset({"/api/ascent/access/request"})
-_AUTHORIZATION_SENSITIVE_PREFIXES = ("/api/admin/ascent/",)
+_AUTHORIZATION_SENSITIVE_PREFIXES = ("/api/admin/ascent/", "/api/internal/")
 
 # These routes authorize or report spend from a server-resolved Personal or
 # organization Wallet. Generic replay happens before route dependencies, so it
