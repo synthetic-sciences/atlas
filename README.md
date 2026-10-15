@@ -49,6 +49,7 @@ npm run build:ui
 npm run test:cli
 npm run test:ui
 npm run test:sdk
+node --test scripts/registry.test.mjs
 uv run --project backend python -m pytest backend/tests --timeout=30
 uv build --project backend --wheel
 node scripts/pack-release.mjs
@@ -68,3 +69,11 @@ Releases authenticate to npm through the repository's `release-npm.yml`
 trusted publisher in the `npm` environment. No npm publishing token is stored
 in Actions. The release workflow checks the exact source commit and artifact
 integrity before publishing.
+
+For a new package name, first stage the checked tarball with `npm stage publish`,
+configure its trusted publisher, and approve the initial staged release on npm.
+A staged version is reserved and cannot be overwritten by a direct publish.
+Resume the release with the same checked artifacts after approval; published
+versions are accepted only when their integrity matches the manifest. Registry
+processing may take several minutes, so verification waits up to five minutes
+per package. Keep package contents unchanged while a release is staged.
