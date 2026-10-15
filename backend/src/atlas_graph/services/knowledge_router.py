@@ -13,6 +13,8 @@ from typing import Any, Literal
 
 from fastapi import HTTPException
 
+from atlas_graph import config
+
 logger = logging.getLogger(__name__)
 
 def _is_embedding_billing_error(exc: Exception) -> bool:
@@ -181,31 +183,33 @@ async def unified_search(
         nonlocal query_embedding_id
         if not run_graph or retrieval_service is None:
             return []
-        query_vec: list[float] | None = None
-        try:
-            embed_result = (
-                await embed(query) if embed is not None
-                else await retrieval_service.embed_text(query, db=db, user_id=user_id)
-            )
-            if isinstance(embed_result, tuple):
-                query_vec, query_embedding_id = embed_result
-            elif isinstance(embed_result, dict):
-                query_vec = embed_result.get("embedding") or embed_result.get(
-                    "vector"
+        search_query: list[float] | str | None = query
+        if config.USE_POSTGRES:
+            search_query = None
+            try:
+                embed_result = (
+                    await embed(query) if embed is not None
+                    else await retrieval_service.embed_text(query, db=db, user_id=user_id)
                 )
-                query_embedding_id = embed_result.get("embedding_id")
-            else:
-                query_vec = embed_result  # bare list[float]
-        except Exception as exc:
-            if _is_embedding_billing_error(exc):
-                raise
-            logger.warning("unified_search: embed_text failed: %s", exc)
-            query_vec = None
+                if isinstance(embed_result, tuple):
+                    search_query, query_embedding_id = embed_result
+                elif isinstance(embed_result, dict):
+                    search_query = embed_result.get("embedding") or embed_result.get(
+                        "vector"
+                    )
+                    query_embedding_id = embed_result.get("embedding_id")
+                else:
+                    search_query = embed_result  # bare list[float]
+            except Exception as exc:
+                if _is_embedding_billing_error(exc):
+                    raise
+                logger.warning("unified_search: embed_text failed: %s", exc)
+                search_query = None
         try:
             raw = await retrieval_service.search_graph(
                 db,
                 user_id,
-                query_vec,
+                search_query,
                 k=k * 2,
                 filters=filters,
             )
