@@ -9,7 +9,11 @@ async function request(path, method = "GET", body) {
   const url = new URL(path, "https://api.vercel.com");
   if (team) url.searchParams.set("teamId", team);
   const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000) });
-  if (!response.ok) throw new Error(`Vercel ${url.pathname} returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const failure = await response.json().catch(() => ({}));
+    const message = String(failure.error?.message || failure.error?.code || "Request failed").replaceAll(token, "[redacted]").slice(0, 300);
+    throw new Error(`Vercel ${url.pathname} returned HTTP ${response.status}: ${message}`);
+  }
   if (response.status === 204) return undefined;
   return response.json();
 }
@@ -69,8 +73,8 @@ if (action === "preview" || action === "production") {
   const created = await request("/v13/deployments", "POST", {
     name: project.name,
     project: project.id,
-    target: action,
-    gitSource: { type: "github", repoId: "1420201479", ref: commit },
+    ...(action === "production" ? { target: "production" } : {}),
+    gitSource: { type: "github", repoId: "1420201479", ref: "main", sha: commit },
   });
   writeFileSync("dist/deployments/landing-deployment.json", `${JSON.stringify({ id: created.id, url: created.url, commit, target: action }, null, 2)}\n`);
   let previous;
