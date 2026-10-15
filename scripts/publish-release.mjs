@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { waitForPackage } from "./registry.mjs";
 
-assert.equal(process.env.ATLAS_PUBLISH, "true", "Publishing must be explicitly enabled by the release workflow");
+assert.ok(["true", "false"].includes(process.env.ATLAS_PUBLISH), "The release workflow must select publication or a dry run explicitly");
+const publish = process.env.ATLAS_PUBLISH === "true";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const directory = path.join(root, "dist/releases");
 const manifest = JSON.parse(readFileSync(path.join(directory, "manifest.json"), "utf8"));
@@ -23,7 +24,8 @@ for (const item of manifest.packages) {
   }
   const error = JSON.parse(existing.stdout || "{}").error;
   assert.equal(error?.code, "E404", `Registry lookup failed for ${spec}: ${error?.code || existing.status}`);
-  execFileSync("npm", ["publish", archive, "--access", "public", "--provenance=false"], { stdio: "inherit" });
+  execFileSync("npm", ["publish", archive, "--access", "public", "--provenance=false", ...(!publish ? ["--dry-run"] : [])], { stdio: "inherit" });
+  if (!publish) continue;
   console.log(`Waiting for registry processing of ${spec}`);
   await waitForPackage(item.name, item.version, item.integrity);
 }
