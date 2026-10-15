@@ -23,6 +23,9 @@ cutover, compatible identities, preserved indexing and signed links, and a
 reverse migration for post-cutover writes. Current customer data stays in its
 existing store until those gates pass.
 
+[Service separation and data rehearsal](service-separation.md) records the
+remaining hosted contracts, the local transfer command, and cutover order.
+
 Public npm artifacts contain only package implementation, declarations,
 documentation, and Apache-2.0 license. Backend source, landing assets, tests,
 credentials, and dashboard source are excluded. CLI depends only on its
