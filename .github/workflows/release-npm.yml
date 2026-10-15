@@ -69,7 +69,6 @@ jobs:
       - name: Publish verified artifacts
         if: inputs.publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           ATLAS_PUBLISH: 'true'
         run: node scripts/publish-release.mjs
       - name: Record private source release

@@ -63,3 +63,8 @@ provenance, which requires public source; release manifests retain artifact hash
 Landing keeps its own frozen Bun lockfile and React 18 dependency tree. Run
 `bun install --frozen-lockfile` and `bun run build` there. The graph UI uses
 React 19 independently. `extraction.json` records source provenance.
+
+Releases authenticate to npm through the repository's `release-npm.yml`
+trusted publisher in the `npm` environment. No npm publishing token is stored
+in Actions. The release workflow checks the exact source commit and artifact
+integrity before publishing.
