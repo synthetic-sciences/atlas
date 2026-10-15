@@ -10,8 +10,10 @@ from atlas_graph.runtime import Host, configure
 def create_app():
     if config.MODE != "hosted":
         raise RuntimeError("The hosted entry point requires ATLAS_MODE=hosted")
-    if not os.environ.get("ATLAS_SIGNING_SECRET", "").strip():
+    if len(os.environ.get("ATLAS_SIGNING_SECRET", "").strip()) < 32:
         raise RuntimeError("Hosted Atlas requires its own signing secret")
+    if os.environ.get("ATLAS_SUPABASE_SERVICE_ROLE_KEY", "").strip():
+        raise RuntimeError("Hosted Atlas must use graph-owned blob storage")
     index_token = os.environ.get("ATLAS_INDEX_SERVICE_TOKEN", "")
     if config.INDEXING_ENABLED and (
         len(index_token.strip()) < 32

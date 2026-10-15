@@ -121,6 +121,34 @@ worker, replay, and writer-fencing checks pass. Its hostname must remain a
 compatibility entry point after cutover. Reserving a name does not migrate
 machines, credentials, volumes, or customer data.
 
+## Graph-owned blobs
+
+The hosted graph service stores evidence under its own `ATLAS_DATA_DIR/blobs`
+on a persistent graph volume. It rejects `ATLAS_SUPABASE_SERVICE_ROLE_KEY`;
+Dashboard's storage administrator credential does not enter Atlas. The embedded
+compatibility package retains its existing optional Supabase client until the
+row-and-object cutover. This is a storage boundary, not evidence of a completed
+production object transfer.
+
+Blob keys are relative, canonical paths. File operations use POSIX directory
+descriptors without following symlinks, reject special files and path escapes,
+and replace uploads atomically with flushed bytes. Failed replacement retains
+the previous complete object. Blocking file I/O runs outside the event loop.
+This local graph-server backend supports Linux and macOS.
+
+Atlas signs its own bounded, path-specific download links. Previews can fetch a
+valid link without exposing the user's bearer token; plain URLs still require
+authentication and graph access. Tokens for other purposes cannot authorize a
+blob read, expired or altered links fail closed, and deleted artifact records
+no longer resolve. Executable content retains sandbox and forced-download
+headers. Existing Supabase signed links remain served by their original private
+bucket until their compatibility window closes.
+
+The cutover must still copy and checksum both the object bucket and the project
+filesystem, preserve referenced paths and active upload batches, rehearse new
+writes and reverse transfer, and switch exactly one writer. Creating a graph
+volume or passing these local tests does not satisfy those migration gates.
+
 ## Database permissions
 
 Atlas can use a separate database or a dedicated schema on the existing

@@ -11,7 +11,7 @@ import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from atlas_graph.auth.access_check import require_node_access
-from atlas_graph.dependencies import get_current_user, get_db
+from atlas_graph.dependencies import get_current_user, get_db, optional_auth
 from atlas_graph.models.artifact import (
     DeleteArtifactRequest,
     FinalizeUploadRequest,
@@ -20,6 +20,7 @@ from atlas_graph.models.artifact import (
 )
 from atlas_graph.services import artifact_service
 from atlas_graph.storage.supabase_storage import storage
+from atlas_graph.storage.url_signer import verify_blob
 
 router = APIRouter()
 
@@ -32,16 +33,15 @@ from atlas_graph.routes._errors import service_error_to_http as _service_error_t
 @router.get("/api/artifacts/download/{path:path}")
 async def download_artifact_blob(
     path: str,
+    token: str | None = None,
     db: aiosqlite.Connection = Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict | None = Depends(optional_auth),
 ):
-    """Serve local artifact blobs returned by the storage fallback.
-
-    Supabase-backed artifacts use signed URLs. Local development returns
-    /api/artifacts/download/<storage_path>, so this route performs the same
-    node ACL check before streaming bytes from the local storage client.
-    """
+    """Serve a path-bound signed capability or authenticate graph access."""
     storage_path = path.lstrip("/")
+    signed = token is not None and verify_blob(token, storage_path)
+    if not signed and user is None:
+        raise HTTPException(401, detail="Artifact authentication required")
     cursor = await db.execute(
         "SELECT node_id, title FROM artifacts WHERE storage_path = ?",
         (storage_path,),
@@ -52,7 +52,8 @@ async def download_artifact_blob(
 
     node_id, title = raw[0], raw[1]
     try:
-        await require_node_access(db, user["user_id"], node_id, "view")
+        if not signed:
+            await require_node_access(db, user["user_id"], node_id, "view")
         data = await storage.download(storage_path)
     except FileNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="blob not found")
