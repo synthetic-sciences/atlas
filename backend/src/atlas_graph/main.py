@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     indexer = None
     try:
         await init_db()
-        if config.INDEXING_ENABLED:
+        if config.INDEXING_ENABLED and (config.MODE != "hosted" or config.SERVING_ENABLED):
             from atlas_graph.services.index_jobs import Indexer
 
             indexer = Indexer()
@@ -54,6 +54,8 @@ async def boundaries(request, call_next):
         except HTTPException as error:
             return JSONResponse(status_code=error.status_code, content={"detail": error.detail})
     path = request.url.path
+    if config.MODE == "hosted" and not config.SERVING_ENABLED and path not in {"/api/health", "/api/health/db"}:
+        return JSONResponse(status_code=503, content={"detail": "Graph service is in maintenance"}, headers={"Retry-After": "30"})
     public = path.startswith(("/api/nodes/explore", "/api/researchers", "/api/users/", "/api/competitions", "/api/v1/explore", "/api/v1/researchers", "/api/v1/competitions"))
     if public and not config.PUBLIC_GRAPHS_ENABLED:
         return JSONResponse(status_code=404, content={"detail": "Not found"})
@@ -79,9 +81,15 @@ app.include_router(administration_router)
 @app.get("/api/health")
 @app.get("/api/health/db")
 async def health():
-    async with get_db() as db:
-        await db.execute("SELECT 1")
-    return {"status": "ok", "service": "atlas", "database_backend": "postgres" if config.USE_POSTGRES else "sqlite"}
+    async def probe():
+        async with get_db() as db:
+            await db.execute("SELECT 1")
+
+    try:
+        await asyncio.wait_for(probe(), timeout=3)
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "unavailable", "service": "atlas"})
+    return {"status": "ok", "service": "atlas", "database_backend": "postgres" if config.USE_POSTGRES else "sqlite", "serving": config.SERVING_ENABLED}
 
 
 @app.get("/api/v1/status")
@@ -98,6 +106,9 @@ async def auth_status(user: dict = Depends(get_current_user)):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
+        if config.MODE == "hosted" and not config.SERVING_ENABLED:
+            await websocket.close(code=1013)
+            return
         if websocket.query_params.get("token"):
             await websocket.close(code=4001)
             return

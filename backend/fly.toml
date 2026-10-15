@@ -1,0 +1,42 @@
+app = "synsci-graphs"
+primary_region = "sin"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ATLAS_MODE = "hosted"
+  ATLAS_DATA_DIR = "/data"
+  ATLAS_DATABASE_SCHEMA = "atlas_graph"
+  ATLAS_REQUIRE_POSTGRES = "true"
+  ATLAS_ACCOUNT_URL = "https://synsci-dashboard.fly.dev"
+  ATLAS_SERVER_URL = "https://thesis-synsc.fly.dev"
+  ATLAS_PG_POOL_MAX = "4"
+  ATLAS_PUBLIC_GRAPHS_ENABLED = "false"
+  ATLAS_SERVING_ENABLED = "false"
+  ATLAS_INDEXING_ENABLED = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/api/health/db"
+
+[[mounts]]
+  source = "atlas_graph_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 2

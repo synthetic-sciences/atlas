@@ -132,3 +132,12 @@ async def test_child_events_follow_current_inherited_access_and_fail_closed(
     monkeypatch.setattr(node_repo, "find_root_node_ids", failed)
     await manager.broadcast_graph_event(child, "node_mutated", {"title": "Unavailable"})
     assert len(received[owner]) == 2
+
+
+def test_hosted_maintenance_closes_sockets_before_authentication(sockets, monkeypatch):
+    monkeypatch.setenv("ATLAS_MODE", "hosted")
+    monkeypatch.setenv("ATLAS_SERVING_ENABLED", "false")
+    with sockets.websocket_connect("/api/ws") as socket:
+        with pytest.raises(WebSocketDisconnect) as closed:
+            socket.receive_json()
+        assert closed.value.code == 1013

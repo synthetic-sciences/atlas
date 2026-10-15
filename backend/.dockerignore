@@ -1,0 +1,9 @@
+*
+!pyproject.toml
+!uv.lock
+!LICENSE
+!NOTICE
+!src/
+!src/**
+**/__pycache__/
+**/*.pyc
