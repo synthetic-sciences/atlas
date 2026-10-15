@@ -15,6 +15,7 @@
   "files": [
     "cli/bin",
     "cli/src",
+    "cli/LICENSE",
     "ui/src",
     "README.md",
     "NOTICE"
