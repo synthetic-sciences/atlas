@@ -42,7 +42,8 @@ if (action === "migrate" || action === "rollback") {
   if (![1244965779, 1420201479].includes(Number(project.link?.repoId))) throw new Error("Refusing to replace an unexpected Git connection");
   writeFileSync("dist/deployments/landing-before.json", `${JSON.stringify(project, null, 2)}\n`);
   const restore = async () => {
-    await request(`${endpoint}/link`, "DELETE");
+    const current = await request(endpoint);
+    if (current.link) await request(`${endpoint}/link`, "DELETE");
     await request(`${endpoint}/link`, "POST", { type: "github", repo: `${project.link.org}/${project.link.repo}` });
     await request(endpoint, "PATCH", { rootDirectory: project.rootDirectory });
   };

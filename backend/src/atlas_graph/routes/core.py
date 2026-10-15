@@ -1,26 +1,20 @@
 """Graph HTTP contract shared by the hosted adapter and standalone Atlas."""
 from __future__ import annotations
 import hashlib
-import ipaddress
 import json
 import logging
 import mimetypes
-import os
-import re
-import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlencode, urlparse
-from uuid import UUID
 import aiosqlite
-import httpx
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from atlas_graph import config
-from atlas_graph.auth.access_check import check_node_access, require_node_access
-from atlas_graph.dependencies import get_current_user, get_db, optional_auth
+from atlas_graph.auth.access_check import require_node_access
+from atlas_graph.dependencies import get_current_user, get_db
 from atlas_graph.models.artifact import DeleteArtifactRequest, FinalizeUploadRequest, PrepareUploadRequest, SetArtifactNoteRequest
 from atlas_graph.models.node import AddParentRequest, BranchNodeRequest, CommitNodeRequest, MergeNodesRequest, RemoveParentRequest, StageNodeCreateRequest, StageNodeUpdateRequest
 from atlas_graph.models.sharing import SetSharingBatchRequest, SetSharingRequest
