@@ -13,16 +13,22 @@ from atlas_graph.db.connection import close_db, get_db, init_db
 from atlas_graph.dependencies import get_current_user, require_local_connection
 from atlas_graph.middleware.idempotency import IdempotencyMiddleware
 from atlas_graph.realtime.websocket_server import manager
+from atlas_graph.runtime import host
 from atlas_graph.routes import artifacts, audit, browse, campaigns, competitions, core, export_import, nodes, runs, semantics, sharing, tags, users
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    shutdown = host().shutdown
     try:
+        await init_db()
         yield
     finally:
-        await close_db()
+        try:
+            await close_db()
+        finally:
+            if shutdown is not None:
+                await shutdown()
 
 
 app = FastAPI(title="Atlas graph API", lifespan=lifespan, docs_url="/docs" if config.MODE == "local" else None, redoc_url=None, openapi_url="/openapi.json" if config.MODE == "local" else None)
