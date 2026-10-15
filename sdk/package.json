@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Dependency-free JavaScript client for the Atlas graph API",
   "license": "Apache-2.0",
