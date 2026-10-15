@@ -10,6 +10,8 @@ from atlas_graph.runtime import Host, configure
 def create_app():
     if config.MODE != "hosted":
         raise RuntimeError("The hosted entry point requires ATLAS_MODE=hosted")
+    if config.REQUIRE_POSTGRES and not config.USE_POSTGRES:
+        raise RuntimeError("This hosted deployment requires its graph PostgreSQL database")
     if len(os.environ.get("ATLAS_SIGNING_SECRET", "").strip()) < 32:
         raise RuntimeError("Hosted Atlas requires its own signing secret")
     if os.environ.get("ATLAS_SUPABASE_SERVICE_ROLE_KEY", "").strip():

@@ -1,3 +1,4 @@
+import asyncio
 import os
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -15,6 +16,7 @@ async def test_graph_postgres_initialization_and_project_contract(tmp_path, monk
     monkeypatch.setenv("ATLAS_DATABASE_URL", dsn)
     monkeypatch.setenv("ATLAS_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("ATLAS_MODE", "local")
+    monkeypatch.setenv("ATLAS_PG_POOL_MAX", "1")
     from atlas_graph.db.connection import close_db, get_db, init_db
     from atlas_graph.main import app
 
@@ -28,6 +30,8 @@ async def test_graph_postgres_initialization_and_project_contract(tmp_path, monk
             second = await client.post("/api/v1/projects", json={"title": "Independent PostgreSQL graph", "dedupe_key": marker})
             assert second.json()["project_id"] == first.json()["project_id"]
             assert second.json()["deduped"] is True
+            concurrent = await asyncio.gather(*[client.get("/api/v1/projects") for _ in range(10)])
+            assert all(item.status_code == 200 for item in concurrent), [item.status_code for item in concurrent]
             assert (await client.get(f"/api/nodes/{first.json()['project_id']}/tree?projection=full")).status_code == 200
         async with get_db() as db:
             cursor = await db.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")

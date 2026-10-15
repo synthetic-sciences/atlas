@@ -45,11 +45,19 @@ async def init_db() -> None:
         namespace = config.DATABASE_SCHEMA
         if not re.fullmatch(r"[a-z_][a-z0-9_]*", namespace):
             raise RuntimeError("ATLAS_DATABASE_SCHEMA must be a PostgreSQL identifier")
+        try:
+            maximum = int(config.PG_POOL_MAX)
+        except (ValueError, TypeError):
+            raise RuntimeError("ATLAS_PG_POOL_MAX must be between 1 and 32") from None
+        if not 1 <= maximum <= 32:
+            raise RuntimeError("ATLAS_PG_POOL_MAX must be between 1 and 32")
         if _pool is None:
             _pool = await asyncpg.create_pool(
                 config.DATABASE_URL,
                 min_size=1,
-                max_size=10,
+                max_size=maximum,
+                timeout=10,
+                command_timeout=60,
                 server_settings={"search_path": f'"{namespace}", public'},
             )
         try:

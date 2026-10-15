@@ -287,3 +287,41 @@ Live descendant events include current collaborators and owners of every
 containing graph root, as well as legacy direct rules. Removing an inherited
 rule stops later events; failed ACL lookups suppress the event. Public
 visibility alone does not send every graph mutation to every connected user.
+
+The graph runtime image is built from the locked Python project alone with an
+allowlisted Docker context. It runs as UID/GID 10001, without Dashboard source
+or development dependencies. A new graph volume must be owned by that UID
+before starting it. Hosted credentials enter as deployment secrets, never
+image build arguments. `ATLAS_REQUIRE_POSTGRES=true` prevents an accidental
+fallback to a new SQLite database when the PostgreSQL secret is missing.
+
+`backend/fly.toml` targets the reserved `synsci-graphs` app in Singapore. Its
+initial state disables serving and indexing; the database health endpoint
+still checks the real pool with a three-second deadline. HTTP graph operations
+return maintenance 503 and sockets close with 1013 until serving is enabled.
+The automatic indexer also stays stopped during maintenance. This prevents an
+unmigrated app from accepting new graph data; it does not replace the database
+writer fence required before migration. Fly uses stop/autostart, never suspend,
+with one warm machine. The per-process graph pool is bounded by
+`ATLAS_PG_POOL_MAX` (1–32, default 10; this deployment requests 4), plus bounded
+connection and command deadlines. Count every Dashboard, OAuth, worker, graph,
+and rollout process against the database's actual connection quota before
+provisioning. One process owns HTTP and the durable indexer in this initial
+layout. Scale and pricing still require the production migration gates.
+
+The graph configuration retains `thesis-synsc.fly.dev` as its public link
+origin. Its future compatibility proxy must remain in service for old links,
+clients, OAuth callbacks, and webhooks. The graph service's own deployment does
+not implement that legacy-host proxy or copy any data. Enable serving/indexing
+only after verified row/object transfer, account lifecycle/skill compatibility,
+writer fencing, reverse rollback, and provider readiness. No auto-deploy is
+configured for this runtime preparation.
+
+The container rehearsal runs the actual Dashboard and graph images with a
+separate PostgreSQL graph login and a graph-owned volume. It verifies initial
+maintenance blocks all project writes, twelve concurrent authenticated reads
+work with a one-connection graph pool, the graph login cannot read private
+account keys, and graph rows/blob bytes survive a container restart. The old
+account schema receives no graph rows. The image CI contract separately checks
+non-root SQLite operation, authenticated project creation/read, hidden feature
+404s, and graph-owned blob writes.

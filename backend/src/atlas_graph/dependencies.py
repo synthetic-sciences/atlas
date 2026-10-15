@@ -1,5 +1,6 @@
 """Graph identities come from explicit local or hosting adapters."""
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import os
 from urllib.parse import urlsplit
@@ -36,13 +37,23 @@ async def get_current_user(request: Request) -> dict:
     if request.headers.get("authorization") != f"Bearer {expected}":
         raise HTTPException(status_code=401, detail="Local Atlas authentication required")
     now = datetime.now(timezone.utc).isoformat()
-    async with database() as db:
+    async with identity_database(request) as db:
         await db.execute(
             "INSERT INTO users (user_id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT (user_id) DO NOTHING",
             (LOCAL_USER_ID, "owner@atlas.local", "Local researcher", now, now),
         )
         await db.commit()
     return {"user_id": LOCAL_USER_ID, "key_id": "local", "email": "owner@atlas.local"}
+
+
+@asynccontextmanager
+async def identity_database(request: Request):
+    bound = getattr(request.state, "atlas_database", None)
+    if bound is not None:
+        yield bound
+        return
+    async with database() as db:
+        yield db
 
 
 async def optional_auth(request: Request) -> dict | None:
