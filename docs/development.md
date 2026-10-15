@@ -28,6 +28,8 @@ discovery is disabled by default.
 Optional direct embeddings use `ATLAS_EMBEDDING_API_KEY`,
 `ATLAS_EMBEDDING_BASE_URL`, and `ATLAS_EMBEDDING_MODEL`. Hosted provider policy
 and credentials belong to Dashboard and use the managed adapter instead.
+SQLite queries search existing indexed text directly, without requesting or
+charging a query embedding. Graph access and inherited sharing still apply.
 
 ## Hosted integration
 

@@ -82,7 +82,8 @@ standalone scheduler test does not authorize moving the live indexer.
 ## Managed graph search
 
 The standalone `/api/knowledge/search` route searches only graph chunks the
-caller may read. Its request-bound query adapter forwards the user's bearer,
+caller may read. SQLite searches indexed text directly without a paid query
+embedding. PostgreSQL uses its request-bound query adapter, which forwards the user's bearer,
 workspace selection, and account-service credential to Dashboard's fixed
 `/api/internal/atlas/query/embeddings` operation. Provider credentials, billing
 receipts, and Wallet records never enter Atlas. The independent index-service
