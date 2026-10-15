@@ -124,6 +124,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # Only apply to mutation methods
         if request.method not in _MUTATION_METHODS:
             return await call_next(request)
+        if request.method == "PUT" and request.url.path.startswith(
+            ("/api/v1/artifacts/uploads/", "/api/artifacts/upload/")
+        ):
+            return await call_next(request)
         if request.url.path in _AUTHORIZATION_SENSITIVE_PATHS or request.url.path.startswith(
             _AUTHORIZATION_SENSITIVE_PREFIXES
         ):

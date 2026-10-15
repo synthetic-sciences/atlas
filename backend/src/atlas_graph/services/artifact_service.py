@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from atlas_graph.auth.access_check import require_node_access
@@ -256,7 +256,8 @@ def _sign_upload_ticket(
 # ---------------------------------------------------------------------------
 
 async def handle_upload(
-    db, upload_id: str, content_type: str, filename: str, data: bytes
+    db, upload_id: str, content_type: str, filename: str, data: bytes,
+    *, user_id: str | None = None, claims: dict | None = None,
 ) -> dict:
     """
     Handle the raw file upload for a single artifact.
@@ -283,7 +284,7 @@ async def handle_upload(
         # safely. asyncpg JSONB cast happens via the column type.
         needle = json.dumps([{"upload_id": upload_id}])
         cursor = await db.execute(
-            "SELECT batch_token, node_id, items FROM artifact_upload_batches "
+            "SELECT batch_token, node_id, items, expires_at FROM artifact_upload_batches "
             "WHERE items @> ?::jsonb LIMIT 1",
             (needle,),
         )
@@ -292,14 +293,16 @@ async def handle_upload(
         # "scan only batches whose serialized items contains the upload_id".
         # Quote-anchored so e.g. upload_id "abc" doesn't match "abcdef".
         cursor = await db.execute(
-            "SELECT batch_token, node_id, items FROM artifact_upload_batches "
+            "SELECT batch_token, node_id, items, expires_at FROM artifact_upload_batches "
             "WHERE items LIKE ? LIMIT 1",
             (f'%"upload_id": "{upload_id}"%',),
         )
     batch_row = await cursor.fetchone()
 
     if batch_row is not None:
-        b_token, b_node_id, items_json = batch_row
+        b_token, b_node_id, items_json, expires = batch_row
+        if datetime.fromisoformat(str(expires).replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+            raise PermissionError("Upload batch has expired")
         items = _json_list(items_json)
         for item in items:
             if item["upload_id"] == upload_id:
@@ -310,6 +313,15 @@ async def handle_upload(
 
     if target_item is None:
         raise ValueError(f"Upload ID {upload_id} not found in any batch")
+
+    if user_id is not None:
+        await require_node_access(db, user_id, target_node_id, "write")
+    elif (
+        not claims or claims.get("upload_id") != upload_id
+        or claims.get("node_id") != target_node_id
+        or claims.get("batch_token") != target_batch_token
+    ):
+        raise PermissionError("Upload ticket does not match this batch")
 
     artifact_id = target_item["artifact_id"]
     original_filename = target_item["filename"]
