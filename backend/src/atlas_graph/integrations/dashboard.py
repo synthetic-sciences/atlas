@@ -11,7 +11,7 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import httpx
 from fastapi import HTTPException, Request
-from pydantic import BaseModel, Field, StrictBool, StrictStr, ValidationError
+from pydantic import BaseModel, Field, StrictBool, StrictInt, StrictStr, ValidationError
 
 from atlas_graph.clients.github_client import GitHubError
 from atlas_graph.db.connection import get_db
@@ -71,6 +71,15 @@ class Embeddings(BaseModel):
 
 class QueryEmbeddings(Embeddings):
     request_hash: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+
+class UploadTicket(BaseModel):
+    upload_id: UUID
+    node_id: UUID
+    batch_token: str = Field(strict=True, min_length=1, max_length=512)
+    content_type: str = Field(strict=True, min_length=1, max_length=256)
+    iat: StrictInt
+    exp: StrictInt
 
 
 class Query:
@@ -263,6 +272,15 @@ class Dashboard:
 
     def query(self, request: Request) -> Query:
         return Query(self, request)
+
+    async def upload_ticket(self, ticket: str) -> dict:
+        if len(ticket) > 16_384:
+            raise HTTPException(403, detail="Invalid upload ticket")
+        payload = await self.request("upload-ticket", method="POST", body={"ticket": ticket})
+        try:
+            return UploadTicket.model_validate(payload).model_dump(mode="json")
+        except ValidationError:
+            raise HTTPException(503, detail="Invalid upload ticket service response") from None
 
     async def index_node(self, node: dict, chunks: list[dict]) -> list[list[float]]:
         if not chunks:

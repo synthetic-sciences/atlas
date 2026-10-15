@@ -1852,6 +1852,9 @@ async def handle_ticket_upload(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Invalid ticket format"
             )
         payload = verify_signed_token(ticket[3:])
+        verifier = host().upload_ticket
+        if payload is None and verifier is not None:
+            payload = await verifier(ticket[3:])
         if payload is None or payload.get("upload_id") != upload_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1883,7 +1886,7 @@ async def handle_ticket_upload(
             or "upload"
         )
         result = await artifact_service.handle_upload(
-            db, upload_id, content_type, filename, data
+            db, upload_id, content_type, filename, data, claims=payload,
         )
         return {
             "upload": {

@@ -130,9 +130,9 @@ async def handle_upload(
 
     try:
         return await artifact_service.handle_upload(
-            db, upload_id, content_type, filename, data
+            db, upload_id, content_type, filename, data, user_id=user["user_id"],
         )
-    except ValueError as e:
+    except (ValueError, PermissionError) as e:
         raise _service_error_to_http(e)
 
 

@@ -149,6 +149,28 @@ filesystem, preserve referenced paths and active upload batches, rehearse new
 writes and reverse transfer, and switch exactly one writer. Creating a graph
 volume or passing these local tests does not satisfy those migration gates.
 
+## Gateway compatibility contracts
+
+`python -m atlas_graph.contract` exports graph-owned HTTP paths and methods for
+Dashboard's fixed-target gateway. The catalog retains path converters, including
+nested artifact paths; health, account control, and internal service operations
+are excluded. Dashboard can route this contract without importing graph
+implementation modules.
+
+Pending legacy upload tickets remain verifiable through Dashboard's scoped
+`/api/internal/atlas/upload-ticket` adapter. Atlas tries its own signing key
+first, then asks Dashboard to validate a legacy ticket without receiving that
+key. Only typed upload claims return. Atlas requires the upload, node, and batch
+IDs to match the actual unexpired graph batch before writing. Authenticated
+legacy upload endpoints also check graph write access. Signed upload slots skip
+generic JSON response replay, so the documented 10 MiB upload limit works with
+an Idempotency-Key and every retry still validates its live capability.
+
+This compatibility adapter does not authorize a production cutover. Streaming,
+websocket, replay, writer, complete object transfer, and reverse-rollback gates
+remain required. Retire legacy verification after the last pre-cutover upload
+ticket expires, once the gateway is the sole path for new graph work.
+
 ## Database permissions
 
 Atlas can use a separate database or a dedicated schema on the existing

@@ -64,9 +64,12 @@ async def boundaries(request, call_next):
     return response
 
 
-for module in [nodes, tags, sharing, artifacts, audit, export_import, browse, campaigns, competitions, users, runs, semantics, knowledge]:
-    app.include_router(module.router)
-app.include_router(core.router, prefix="/api/v1")
+GRAPH_ROUTERS = [(module, "") for module in (
+    nodes, tags, sharing, artifacts, audit, export_import, browse, campaigns,
+    competitions, users, runs, semantics, knowledge,
+)] + [(core, "/api/v1")]
+for module, prefix in GRAPH_ROUTERS:
+    app.include_router(module.router, prefix=prefix)
 
 
 @app.get("/api/health")
