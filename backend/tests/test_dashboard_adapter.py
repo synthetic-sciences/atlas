@@ -112,7 +112,11 @@ async def accounts(client, monkeypatch):
                 "object": {"sha": state["refs"][key]},
                 "private_grant": "must-not-transfer",
             }
-        return {"sha": body["sha"], "private_grant": "must-not-transfer"}
+        matching = {
+            sha for sha in state["refs"].values() if sha.startswith(body["sha"].lower())
+        }
+        resolved = next(iter(matching)) if len(matching) == 1 else body["sha"]
+        return {"sha": resolved, "private_grant": "must-not-transfer"}
 
     http = httpx.AsyncClient(transport=httpx.ASGITransport(app=service))
     remote = Dashboard("http://127.0.0.1", token, client=http)
@@ -282,6 +286,14 @@ async def test_hosted_repository_capture_pin_verify_and_conflicting_tag(
     )
     assert replay.status_code == 200, replay.text
     assert replay.json()["already_pinned"] is True
+    abbreviated = await client.post(
+        f"/api/v1/repos/{project}/pin",
+        json={"tag": "atlas/preserved", "sha": sha[:12]},
+        headers=headers,
+    )
+    assert abbreviated.status_code == 200, abbreviated.text
+    assert abbreviated.json()["already_pinned"] is True
+    assert abbreviated.json()["sha"] == sha[:12]
     conflict = await client.post(
         f"/api/v1/repos/{project}/pin",
         json={"tag": "atlas/preserved", "sha": "b" * 40},
