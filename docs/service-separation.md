@@ -19,7 +19,9 @@ provisioned. Atlas uses the matching `ATLAS_ACCOUNT_SERVICE_TOKEN`, a fixed
 HTTPS `ATLAS_ACCOUNT_URL` (loopback HTTP for rehearsal), and its own signing
 secret. This credential grants only the graph account-adapter endpoints; it
 does not authenticate as a user or grant database access. A user credential is
-also required for identity. No account authentication cache survives a request.
+also required for identity. No account authentication cache survives a request. Profile refresh reuses a
+request-bound graph connection when one already exists; it never holds one
+pool slot while waiting for a second slot to authorize that same request.
 
 Hosted repository capture, pin, and verification use a request-bound repository
 adapter. It forwards only the caller's bearer and workspace header plus the
