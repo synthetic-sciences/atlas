@@ -20,6 +20,7 @@ from atlas_graph.models.node import AddParentRequest, BranchNodeRequest, CommitN
 from atlas_graph.models.sharing import SetSharingBatchRequest, SetSharingRequest
 from atlas_graph.models.tag import TagAssignment, TagCreate, TagDelete, TagUpdate
 from atlas_graph.routes._errors import service_error_to_http as _service_error_to_http
+from atlas_graph.runtime import host
 from atlas_graph.services import artifact_service, audit_service, campaign_service, export_import_service, node_service, project_state_service, repo_state_service, research_log_service, sharing_service, stage_lease_service, tag_service
 from atlas_graph.storage.supabase_storage import storage
 from atlas_graph.storage.url_signer import verify_signed_token
@@ -83,6 +84,7 @@ async def cli_merge_projects(
 @router.post("/repos/{node_id}/pin")
 async def cli_pin_project_repo(
     node_id: str,
+    request: Request,
     body: dict[str, Any] | None = Body(None),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -95,12 +97,14 @@ async def cli_pin_project_repo(
         node_id=node_id,
         sha=payload.get("sha"),
         tag=payload.get("tag"),
+        repository=host().repository(request) if host().repository else None,
     )
 
 
 @router.post("/repos/{node_id}/capture")
 async def cli_capture_project_repo(
     node_id: str,
+    request: Request,
     body: dict[str, Any] | None = Body(None),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -116,12 +120,14 @@ async def cli_capture_project_repo(
         head_commit_sha=payload.get("head_commit_sha"),
         pin_commit=bool(payload.get("pin", False)),
         tag=payload.get("tag"),
+        repository=host().repository(request) if host().repository else None,
     )
 
 
 @router.get("/repos/{node_id}/verify")
 async def cli_verify_project_repo(
     node_id: str,
+    request: Request,
     sha: str | None = Query(None),
     tag: str | None = Query(None),
     db: aiosqlite.Connection = Depends(get_db),
@@ -133,6 +139,7 @@ async def cli_verify_project_repo(
         node_id=node_id,
         sha=sha,
         tag=tag,
+        repository=host().repository(request) if host().repository else None,
     )
 
 

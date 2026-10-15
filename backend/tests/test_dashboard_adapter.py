@@ -1,5 +1,6 @@
 """HTTP account contract fixtures keep Atlas independent of a Dashboard tree."""
 
+import json
 from uuid import uuid4
 
 import httpx
@@ -24,6 +25,11 @@ async def accounts(client, monkeypatch):
         "mismatched": False,
         "collaboration": True,
         "calls": [],
+        "repository_calls": [],
+        "refs": {},
+        "connected": True,
+        "invalid_repository": False,
+        "revoke_on_pin": False,
     }
     service = FastAPI()
 
@@ -71,6 +77,43 @@ async def accounts(client, monkeypatch):
         assert "authorization" not in request.headers
         return {"enabled": state["collaboration"], "label": "Account"}
 
+    @service.post("/api/internal/atlas/repository")
+    async def repository(request: Request):
+        body = await request.json()
+        if state["revoke_on_pin"] and body["operation"] == "create_ref":
+            state["revoked"] = True
+        await identity(request)
+        state["repository_calls"].append((body, dict(request.headers)))
+        if state["invalid_repository"]:
+            return {"connected": "yes", "object": {"sha": "invalid"}}
+        if body["operation"] == "status":
+            return {"connected": state["connected"]}
+        ref = body.get("ref", "").removeprefix("refs/")
+        if ref and not ref.startswith(("tags/", "heads/")):
+            ref = f"tags/{ref}"
+        key = (body["repo"], ref)
+        if body["operation"] == "create_ref":
+            if key in state["refs"]:
+                raise HTTPException(
+                    422,
+                    detail={
+                        "code": "github_error",
+                        "message": "Reference already exists",
+                    },
+                )
+            state["refs"][key] = body["sha"]
+        if body["operation"] in {"create_ref", "ref"}:
+            if key not in state["refs"]:
+                raise HTTPException(
+                    404,
+                    detail={"code": "github_error", "message": "GitHub request failed"},
+                )
+            return {
+                "object": {"sha": state["refs"][key]},
+                "private_grant": "must-not-transfer",
+            }
+        return {"sha": body["sha"], "private_grant": "must-not-transfer"}
+
     http = httpx.AsyncClient(transport=httpx.ASGITransport(app=service))
     remote = Dashboard("http://127.0.0.1", token, client=http)
     configure(
@@ -79,6 +122,7 @@ async def accounts(client, monkeypatch):
             optional_auth=remote.optional_auth,
             collaboration=remote.collaboration_allowed,
             collaboration_label=remote.collaboration_label,
+            repository=remote.repository,
         )
     )
     try:
@@ -202,6 +246,141 @@ async def test_hosted_collaboration_observes_account_capability_changes(accounts
     assert await remote.collaboration_label(None, first) == "Account"
     state["collaboration"] = False
     assert await remote.collaboration_allowed(None, first) is False
+
+
+async def test_hosted_repository_capture_pin_verify_and_conflicting_tag(
+    client, accounts
+):
+    state, _, _, _, workspace = accounts
+    headers = {
+        "Authorization": "Bearer first",
+        "X-Organization-ID": workspace,
+        "X-User-ID": str(uuid4()),
+    }
+    project = (
+        await client.post(
+            "/api/v1/projects",
+            json={"title": "Code state", "repo_url": "https://github.com/owner/repo"},
+            headers=headers,
+        )
+    ).json()["project_id"]
+    sha = "a" * 40
+    capture = await client.post(
+        f"/api/v1/repos/{project}/capture",
+        json={"head_commit_sha": sha, "pin": True, "tag": "atlas/preserved"},
+        headers=headers,
+    )
+    assert capture.status_code == 200, capture.text
+    assert capture.json()["pinned"] is True
+    verify = await client.get(f"/api/v1/repos/{project}/verify", headers=headers)
+    assert verify.status_code == 200, verify.text
+    assert verify.json()["commit_reachable"] is True
+    replay = await client.post(
+        f"/api/v1/repos/{project}/pin",
+        json={"tag": "atlas/preserved", "sha": sha},
+        headers=headers,
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["already_pinned"] is True
+    conflict = await client.post(
+        f"/api/v1/repos/{project}/pin",
+        json={"tag": "atlas/preserved", "sha": "b" * 40},
+        headers=headers,
+    )
+    assert conflict.status_code == 409, conflict.text
+    assert state["refs"][("owner/repo", "tags/atlas/preserved")] == sha
+    for body, received in state["repository_calls"]:
+        assert received["authorization"] == "Bearer first"
+        assert received["x-organization-id"] == workspace
+        assert "x-user-id" not in received
+        assert set(body) <= {"operation", "repo", "ref", "sha"}
+    assert "must-not-transfer" not in capture.text + verify.text + replay.text
+
+
+async def test_hosted_repository_checks_graph_write_access_before_account_operation(
+    client, accounts
+):
+    state, *_ = accounts
+    project = (
+        await client.post(
+            "/api/v1/projects",
+            json={"title": "Owned", "repo_url": "owner/repo"},
+            headers={"Authorization": "Bearer first"},
+        )
+    ).json()["project_id"]
+    denied = await client.post(
+        f"/api/v1/repos/{project}/pin",
+        json={"sha": "a" * 40},
+        headers={"Authorization": "Bearer second"},
+    )
+    assert denied.status_code == 403, denied.text
+    assert state["repository_calls"] == []
+    from atlas_graph.db.repos import access_repo
+
+    second = accounts[3]
+    async with get_db() as db:
+        await access_repo.set_access_rule(
+            db, node_id=project, user_id=second, access_level="USER"
+        )
+    visible = await client.get(
+        f"/api/nodes/{project}/tree", headers={"Authorization": "Bearer second"}
+    )
+    assert visible.status_code == 200, visible.text
+    denied = await client.post(
+        f"/api/v1/repos/{project}/pin",
+        json={"sha": "a" * 40},
+        headers={"Authorization": "Bearer second"},
+    )
+    assert denied.status_code == 403
+    assert state["repository_calls"] == []
+    async with get_db() as db:
+        value = (
+            await db.execute_fetchall(
+                "SELECT semantic_data FROM nodes WHERE node_id=?", (project,)
+            )
+        )[0][0]
+        assert not json.loads(value or "{}").get("code_state", {}).get("pinned_sha")
+
+
+async def test_hosted_repository_requires_connection_and_revalidates_bearer(accounts):
+    state, remote, *_ = accounts
+    repository = remote.repository(
+        Request({"type": "http", "headers": [(b"authorization", b"Bearer first")]})
+    )
+    state["connected"] = False
+    assert await repository.is_connected("owner/repo") is False
+    state["revoked"] = True
+    with pytest.raises(HTTPException) as revoked:
+        await repository.get_commit("owner/repo", "a" * 40)
+    assert revoked.value.status_code == 401
+    state["revoked"] = False
+    state["invalid_repository"] = True
+    with pytest.raises(HTTPException) as malformed:
+        await repository.is_connected("owner/repo")
+    assert malformed.value.status_code == 503
+    with pytest.raises(HTTPException) as malformed:
+        await repository.get_ref("owner/repo", "tags/a")
+    assert malformed.value.status_code == 503
+
+
+async def test_hosted_repository_preserves_revocation_between_connection_and_write(
+    client, accounts
+):
+    state, *_ = accounts
+    headers = {"Authorization": "Bearer first"}
+    project = (
+        await client.post(
+            "/api/v1/projects",
+            json={"title": "Revoked", "repo_url": "owner/repo"},
+            headers=headers,
+        )
+    ).json()["project_id"]
+    state["revoke_on_pin"] = True
+    response = await client.post(
+        f"/api/v1/repos/{project}/pin", json={"sha": "a" * 40}, headers=headers
+    )
+    assert response.status_code == 401, response.text
+    assert state["refs"] == {}
 
 
 @pytest.mark.parametrize(

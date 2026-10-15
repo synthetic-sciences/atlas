@@ -15,6 +15,8 @@ from typing import Any
 import aiosqlite
 from fastapi import HTTPException
 
+from atlas_graph.clients.repository import DirectRepository, Repository
+from atlas_graph.auth.access_check import check_node_access
 from atlas_graph.db.repos import node_repo
 from atlas_graph.models.node import StageNodeUpdateRequest
 from atlas_graph.services import node_service
@@ -97,17 +99,26 @@ async def pin(
     node_id: str,
     sha: str | None = None,
     tag: str | None = None,
+    repository: Repository | None = None,
 ) -> dict[str, Any]:
     """Pin a recorded commit under an immutable Atlas tag."""
     from atlas_graph.clients import github_client
 
+    allowed = await check_node_access(db, user_id, node_id, "write")
+    if allowed is not True:
+        raise HTTPException(
+            status_code=404 if allowed is None else 403,
+            detail="Node not found" if allowed is None else "Access denied",
+        )
     node = await node_service.get_node(db, user_id, node_id)
     repo_url = node.get("repo_url")
     if not repo_url:
         raise HTTPException(status_code=404, detail="node has no repository linked")
     parsed = _parse_repo_url(repo_url)
     if parsed is None:
-        raise HTTPException(status_code=400, detail=f"unrecognized repo_url: {repo_url}")
+        raise HTTPException(
+            status_code=400, detail=f"unrecognized repo_url: {repo_url}"
+        )
     owner, repo = parsed
 
     target_sha = (sha or node.get("head_commit_sha") or "").strip()
@@ -117,8 +128,10 @@ async def pin(
             detail="no commit to pin: record head_commit_sha or pass sha after pushing it",
         )
 
-    token = await _resolve_github_auth(db, user_id, owner=owner)
-    if not token:
+    remote = repository or DirectRepository(
+        await _resolve_github_auth(db, user_id, owner=owner)
+    )
+    if not await remote.is_connected(f"{owner}/{repo}"):
         raise HTTPException(
             status_code=400,
             detail="connect GitHub with Contents write access before pinning code",
@@ -129,16 +142,27 @@ async def pin(
     ref = f"refs/tags/{target_tag}"
     already = False
     try:
-        await github_client.create_ref(
+        await remote.create_ref(
             f"{owner}/{repo}",
             ref,
             target_sha,
-            auth_token=token,
         )
     except github_client.GitHubError as exc:
         if exc.status == 422:
             message = (exc.message or "").lower()
             if "already exists" in message or "reference already exists" in message:
+                try:
+                    existing = await remote.get_ref(f"{owner}/{repo}", target_tag)
+                except github_client.GitHubError:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Could not verify the existing repository tag",
+                    ) from None
+                if existing.get("object", {}).get("sha") != target_sha:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="The repository tag already points to a different commit",
+                    )
                 already = True
             else:
                 raise HTTPException(
@@ -151,9 +175,13 @@ async def pin(
                 detail="GitHub rejected the write; reconnect with Contents write access",
             ) from exc
         elif exc.status == 404:
-            raise HTTPException(status_code=404, detail="repository not found or no access") from exc
+            raise HTTPException(
+                status_code=404, detail="repository not found or no access"
+            ) from exc
         else:
             raise HTTPException(status_code=502, detail=f"github: {exc}") from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"github: {exc}") from exc
 
@@ -187,6 +215,7 @@ async def capture(
     head_commit_sha: str | None = None,
     pin_commit: bool = False,
     tag: str | None = None,
+    repository: Repository | None = None,
 ) -> dict[str, Any]:
     """Record caller-observed code state and optionally pin its commit."""
     node = await node_service.get_node(db, user_id, node_id)
@@ -225,6 +254,7 @@ async def capture(
             node_id=node_id,
             sha=head_commit_sha,
             tag=tag,
+            repository=repository,
         )
         result.update(pinned)
     except HTTPException as exc:
@@ -239,6 +269,7 @@ async def verify(
     node_id: str,
     sha: str | None = None,
     tag: str | None = None,
+    repository: Repository | None = None,
 ) -> dict[str, Any]:
     """Verify that captured code state is reachable on the remote."""
     from atlas_graph.clients import github_client
@@ -250,20 +281,21 @@ async def verify(
         raise HTTPException(status_code=404, detail="node has no repository linked")
     parsed = _parse_repo_url(repo_url)
     if parsed is None:
-        raise HTTPException(status_code=400, detail=f"unrecognized repo_url: {repo_url}")
+        raise HTTPException(
+            status_code=400, detail=f"unrecognized repo_url: {repo_url}"
+        )
     owner, repo = parsed
     semantics = parse_node_semantics(node)
     code_state = semantics.get("code_state")
     if not isinstance(code_state, dict):
         code_state = {}
     target_sha = str(
-        sha
-        or node.get("head_commit_sha")
-        or code_state.get("head_commit_sha")
-        or ""
+        sha or node.get("head_commit_sha") or code_state.get("head_commit_sha") or ""
     ).strip()
     target_tag = str(tag or code_state.get("pinned_tag") or "").strip()
-    token = await _resolve_github_auth(db, user_id, owner=owner)
+    remote = repository or DirectRepository(
+        await _resolve_github_auth(db, user_id, owner=owner)
+    )
 
     result: dict[str, Any] = {
         "repo": f"{owner}/{repo}",
@@ -274,10 +306,9 @@ async def verify(
     }
     if target_tag:
         try:
-            ref_data = await github_client.get_ref(
+            ref_data = await remote.get_ref(
                 f"{owner}/{repo}",
                 target_tag,
-                auth_token=token,
             )
             obj = ref_data.get("object") if isinstance(ref_data, dict) else {}
             ref_sha = obj.get("sha") if isinstance(obj, dict) else None
@@ -290,18 +321,17 @@ async def verify(
 
     if target_sha and not result["commit_reachable"]:
         try:
-            await github_client.get_commit(
+            await remote.get_commit(
                 f"{owner}/{repo}",
                 target_sha,
-                auth_token=token,
             )
             result["commit_reachable"] = True
         except github_client.GitHubError as exc:
             if exc.status in (401, 403):
-                raise HTTPException(status_code=403, detail="GitHub rejected the read") from exc
+                raise HTTPException(
+                    status_code=403, detail="GitHub rejected the read"
+                ) from exc
             if exc.status != 404:
                 raise HTTPException(status_code=502, detail=f"github: {exc}") from exc
-    result["reachable"] = bool(
-        result["tag_reachable"] or result["commit_reachable"]
-    )
+    result["reachable"] = bool(result["tag_reachable"] or result["commit_reachable"])
     return result
