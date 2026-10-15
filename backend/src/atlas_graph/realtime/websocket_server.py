@@ -86,8 +86,8 @@ class ConnectionManager:
     async def broadcast_graph_event(self, node_id: str, event_type: str, data: dict):
         """Broadcast to users who have access to this node (owner + collaborators).
 
-        Looks up the node's owner and any collaborators via node_access_rules,
-        then sends only to those users who are currently connected.
+        Includes graph-root owners and collaborators inherited by descendants.
+        Public visibility alone does not subscribe every connected user.
         """
         message = {"type": event_type, "node_id": node_id, "data": data}
 
@@ -102,36 +102,29 @@ class ConnectionManager:
                     self.disconnect(ws, uid)
 
     async def _get_allowed_users(self, node_id: str) -> set[str]:
-        """Return the set of user IDs allowed to receive events for a node.
-
-        Includes the node owner and anyone with a row in node_access_rules.
-        Falls back to all connected users only if the DB lookup fails entirely.
-        """
+        """Resolve current explicit and inherited access, failing closed."""
         allowed: set[str] = set()
         try:
             from atlas_graph.db.connection import get_db
-            from atlas_graph.db.repos import node_repo, access_repo
+            from atlas_graph.db.repos import node_repo
 
             async with get_db() as db:
-                # Get node owner
-                node = await node_repo.get_node(db, node_id)
-                if node:
-                    owner_id = node.get("owner_user_id")
-                    if owner_id:
-                        allowed.add(owner_id)
-
-                # Get collaborators from access rules
-                rules = await access_repo.get_access_rules(db, node_id)
-                for rule in rules:
-                    uid = rule.get("user_id")
-                    if uid:
-                        allowed.add(uid)
+                roots = await node_repo.find_root_node_ids(db, node_id)
+                candidates = list(dict.fromkeys([node_id, *roots]))
+                marks = ",".join("?" for _ in candidates)
+                cursor = await db.execute(
+                    f"SELECT owner_user_id FROM nodes WHERE node_id IN ({marks}) "
+                    f"UNION SELECT user_id FROM node_access_rules WHERE node_id IN ({marks})",
+                    tuple(candidates) * 2,
+                )
+                allowed = {str(row[0]) for row in await cursor.fetchall() if row[0]}
         except Exception:
             logger.warning(
-                "Failed to look up access for node %s; falling back to owner-only",
+                "Failed to look up access for node %s; suppressing the event",
                 node_id,
                 exc_info=True,
             )
+            return set()
 
         # Only send to users who are actually connected
         return allowed & set(self.active_connections.keys())

@@ -14,6 +14,10 @@ def create_app():
         raise RuntimeError("Hosted Atlas requires its own signing secret")
     if os.environ.get("ATLAS_SUPABASE_SERVICE_ROLE_KEY", "").strip():
         raise RuntimeError("Hosted Atlas must use graph-owned blob storage")
+    if os.environ.get("ATLAS_ADMIN_SERVICE_TOKEN", "").strip():
+        from atlas_graph.routes.administration import credential
+
+        credential()
     index_token = os.environ.get("ATLAS_INDEX_SERVICE_TOKEN", "")
     if config.INDEXING_ENABLED and (
         len(index_token.strip()) < 32
