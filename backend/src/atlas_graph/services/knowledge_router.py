@@ -11,6 +11,8 @@ import logging
 import time
 from typing import Any, Literal
 
+from fastapi import HTTPException
+
 logger = logging.getLogger(__name__)
 
 def _is_embedding_billing_error(exc: Exception) -> bool:
@@ -23,7 +25,7 @@ def _is_embedding_billing_error(exc: Exception) -> bool:
 
     return isinstance(
         exc,
-        (EmbeddingBillingError, *errors),
+        (HTTPException, EmbeddingBillingError, *errors),
     )
 
 
@@ -151,6 +153,7 @@ async def unified_search(
     source_ids: list[str] | None = None,
     include_graph: bool = True,
     include_external: bool = True,
+    embed=None,
 ) -> dict[str, Any]:
     """Search native graph chunks and return the compatibility result shape.
 
@@ -180,8 +183,9 @@ async def unified_search(
             return []
         query_vec: list[float] | None = None
         try:
-            embed_result = await retrieval_service.embed_text(
-                query, db=db, user_id=user_id,
+            embed_result = (
+                await embed(query) if embed is not None
+                else await retrieval_service.embed_text(query, db=db, user_id=user_id)
             )
             if isinstance(embed_result, tuple):
                 query_vec, query_embedding_id = embed_result

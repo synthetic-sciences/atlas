@@ -79,6 +79,32 @@ replacement must still pass the coupled account/provider recovery rehearsal,
 writer fencing, storage, gateway, and reverse migration gates. A passing
 standalone scheduler test does not authorize moving the live indexer.
 
+## Managed graph search
+
+The standalone `/api/knowledge/search` route searches only graph chunks the
+caller may read. Its request-bound query adapter forwards the user's bearer,
+workspace selection, and account-service credential to Dashboard's fixed
+`/api/internal/atlas/query/embeddings` operation. Provider credentials, billing
+receipts, and Wallet records never enter Atlas. The independent index-service
+credential cannot authorize a query or impersonate a user.
+
+Dashboard resolves the authenticated Personal or organization Wallet and checks
+current membership and funding access on every request, including replay. A
+query operation is scoped to that user, resolved Wallet, and request UUID.
+Reusing the UUID with different text returns a conflict. Atlas derives a stable
+UUID from the incoming request path and Idempotency-Key when present; independent
+requests without a key receive independent UUIDs. Query text is bounded to 8,192
+characters. Requests that exclude graph search do not request an embedding.
+
+The query and indexing paths share the durable reservation, provider-result,
+price-snapshot, and settlement state machine. A lost delivery reuses its paid
+result; an uncertain provider outcome cannot redispatch until account-side
+reconciliation proves it was uncharged. Expired delivery remains a tombstone.
+Atlas validates the exact query fingerprint, fixed model, and one finite,
+1,536-dimensional vector before searching. Account and funding errors propagate
+instead of silently returning an empty successful search. Generic response
+replay does not bypass this current authorization and Wallet check.
+
 ## Fly layout
 
 The selected app names are `synsci-dashboard` and `synsci-graphs`, both in

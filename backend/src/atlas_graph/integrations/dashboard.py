@@ -7,7 +7,7 @@ import hashlib
 import json
 from typing import Annotated
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import httpx
 from fastapi import HTTPException, Request
@@ -67,6 +67,42 @@ class Embeddings(BaseModel):
         ],
         Field(min_length=1, max_length=16),
     ]
+
+
+class QueryEmbeddings(Embeddings):
+    request_hash: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+
+class Query:
+    def __init__(self, account: Dashboard, request: Request):
+        self.account = account
+        self.headers = account.headers(request)
+        key = request.headers.get("idempotency-key")
+        self.request_id = str(uuid5(
+            NAMESPACE_URL, f"{request.method}:{request.url.path}:{key}",
+        ) if key else uuid4())
+
+    async def embed(self, text: str) -> tuple[list[float], None]:
+        body = {"request_id": self.request_id, "text": text}
+        payload = await self.account.request(
+            "query/embeddings", method="POST", headers=self.headers,
+            body=body, timeout=150,
+        )
+        try:
+            parsed = QueryEmbeddings.model_validate(payload)
+        except ValidationError:
+            raise HTTPException(503, detail="Invalid query service response") from None
+        fingerprint = hashlib.sha256(json.dumps(
+            {"contract": "atlas-query-v1", "model": "openai/text-embedding-3-small", **body},
+            sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        ).encode()).hexdigest()
+        if (
+            parsed.request_hash != fingerprint
+            or parsed.model != "openai/text-embedding-3-small"
+            or len(parsed.vectors) != 1
+        ):
+            raise HTTPException(503, detail="Invalid query service response")
+        return parsed.vectors[0], None
 
 
 class Repository:
@@ -214,12 +250,19 @@ class Dashboard:
             raise HTTPException(503, detail="Invalid account service response")
         return payload
 
-    def repository(self, request: Request) -> Repository:
+    @staticmethod
+    def headers(request: Request) -> dict[str, str]:
         headers = {"Authorization": request.headers.get("authorization", "")}
         organization = request.headers.get("x-organization-id")
         if organization:
             headers["X-Organization-ID"] = organization
-        return Repository(self, headers)
+        return headers
+
+    def repository(self, request: Request) -> Repository:
+        return Repository(self, self.headers(request))
+
+    def query(self, request: Request) -> Query:
+        return Query(self, request)
 
     async def index_node(self, node: dict, chunks: list[dict]) -> list[list[float]]:
         if not chunks:
