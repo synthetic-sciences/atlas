@@ -744,21 +744,12 @@ async function runProjectList(args, config) {
   const apiKey = config.apiKey || config.api_key;
   if (!baseUrl) throw new Error("no base_url configured for the active profile");
   if (!apiKey) throw new Error("no api_key configured for the active profile");
-  const limit = args.limit ? Number(args.limit) : undefined;
-  const path = `/nodes${limit ? `?per_page=${encodeURIComponent(limit)}` : ""}`;
+  const limit = Math.max(1, Math.min(200, Number(args.limit) || 50));
+  const path = `/nodes?root_only=true&page_size=${encodeURIComponent(limit)}&projection=full`;
   const data = await fetchJson(baseUrl, path, { apiKey });
   const nodes = Array.isArray(data?.nodes) ? data.nodes : [];
-  // A "project" in Gateway is a node a session can be rooted at. The backend
-  // doesn't have a unique kind for them yet, so match the two real signals:
-  //   - explicit kind=project, when set
-  //   - the auto-generated ``Project: <slug>`` title the CLI writes when a
-  //     local session syncs into the cloud
-  // Anything else (insights, sessions, experiments) is rejected so this list
-  // is actually useful for "find my parent --project-id".
-  let projects = nodes.filter((n) => {
-    if (n.kind === "project") return true;
-    return /^Project:\s/.test(n.title || "");
-  });
+  // Project identity comes from graph topology; a custom title is still a root.
+  let projects = nodes;
   if (args.orphaned) {
     // No child_ids => the project has no nodes hanging off it. Cheap signal
     // for "session never produced anything"; the dashboard would render it

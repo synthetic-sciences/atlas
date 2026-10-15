@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { nodesApi } from "./api/nodes";
+import { configureGraphFeatures } from "./lib/config";
 
 export interface ReadOptions {
   fresh?: boolean;
@@ -34,12 +35,14 @@ export interface AtlasUIHost {
   Shell?: ComponentType<{ children: ReactNode }>;
   useToast?: () => ToastActions;
   useConfirm?: () => (options: ConfirmOptions) => Promise<boolean>;
+  publicGraphsEnabled?: boolean;
 }
 
 let current: AtlasUIHost = {};
 
 export function configureAtlasUI(host: AtlasUIHost): void {
   current = { ...current, ...host };
+  if (host.publicGraphsEnabled !== undefined) configureGraphFeatures(host.publicGraphsEnabled);
 }
 
 export function atlasUIHost(): AtlasUIHost {

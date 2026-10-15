@@ -45,16 +45,16 @@ def __getattr__(name: str):
         "PUBLIC_GRAPHS_ENABLED": os.environ.get("ATLAS_PUBLIC_GRAPHS_ENABLED", "false").lower() == "true",
         "SERVER_URL": os.environ.get("ATLAS_SERVER_URL", "http://127.0.0.1:8002"),
         "SIGNED_URL_TTL_SECONDS": 3600,
-        "BATCH_TOKEN_TTL_SECONDS": 3600,
-        "MAX_UPLOAD_BYTES": 100 * 1024 * 1024,
+        "BATCH_TOKEN_TTL_SECONDS": 900,
+        "MAX_UPLOAD_BYTES": 10_485_760,
         "SUPABASE_URL": os.environ.get("ATLAS_SUPABASE_URL", ""),
         "SUPABASE_SERVICE_ROLE_KEY": os.environ.get("ATLAS_SUPABASE_SERVICE_ROLE_KEY", ""),
         "SUPABASE_JWT_SECRET": None,
         "SUPABASE_STORAGE_BUCKET": os.environ.get("ATLAS_STORAGE_BUCKET", "blobs"),
         "GITHUB_TOKEN": os.environ.get("GITHUB_TOKEN", ""),
         "IDEMPOTENCY_TTL_DAYS": 7,
-        "IDEMPOTENCY_MAX_BODY_BYTES": 10 * 1024 * 1024,
-        "IDEMPOTENCY_MAX_RESPONSE_BYTES": 2 * 1024 * 1024,
+        "IDEMPOTENCY_MAX_BODY_BYTES": 1_048_576,
+        "IDEMPOTENCY_MAX_RESPONSE_BYTES": 1_048_576,
     }
     if name not in values:
         raise AttributeError(name)
