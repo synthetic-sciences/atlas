@@ -19,6 +19,7 @@ for (const workspace of ["cli", "sdk", "ui"]) {
   const files = packed.files.map(file => file.path);
   assert.ok(files.includes("LICENSE"));
   assert.ok(files.includes("README.md"));
+  if (workspace === "ui") assert.ok(files.includes("graph.css"), "Graph components must ship their stylesheet");
   assert.equal(files.some(file => /(^|\/)(?:\.env|node_modules|tests?|backend|landing|app)(?:[/.]|$)/.test(file)), false);
   assert.equal(files.some(file => /\.(?:test|spec)\./.test(file)), false);
   const archive = path.join(directory, packed.filename);

@@ -7,13 +7,15 @@
   "files": [
     "dist",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "graph.css"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./graph.css": "./graph.css",
     "./*": {
       "types": "./dist/*.d.ts",
       "import": "./dist/*.js"
