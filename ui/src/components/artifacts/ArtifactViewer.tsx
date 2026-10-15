@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import type { Artifact } from "../../api/types";
-import { ArtifactImage } from "./ArtifactImage";
-import { fetchArtifactText, openOrDownloadArtifact } from "../../lib/artifactContent";
+import type { Artifact } from "../../api/types.js";
+import { ArtifactImage } from "./ArtifactImage.js";
+import { fetchArtifactText, openOrDownloadArtifact } from "../../lib/artifactContent.js";
 
 // Artifact types whose viewer renders a textual body. For these we fetch the
 // stored bytes when no inline content is present (sandbox-produced artifacts

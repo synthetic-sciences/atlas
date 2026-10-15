@@ -1,7 +1,7 @@
-import { nodesApi } from "./nodes";
-import { atlasUIHost } from "../runtime";
+import { nodesApi } from "./nodes.js";
+import { atlasUIHost } from "../runtime.js";
 
-export { ApiError, getApiHeadersAsync } from "./internal";
+export { ApiError, getApiHeadersAsync } from "./internal.js";
 
 export const api: typeof nodesApi = new Proxy(nodesApi, {
   get(target, key) {

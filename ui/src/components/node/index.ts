@@ -1,4 +1,4 @@
-export { NodeEditor } from "./NodeEditor";
-export { NodeSidebar } from "./NodeSidebar";
-export { CommitChecklist, getChecklist } from "./CommitChecklist";
-export type { CheckItem } from "./CommitChecklist";
+export { NodeEditor } from "./NodeEditor.js";
+export { NodeSidebar } from "./NodeSidebar.js";
+export { CommitChecklist, getChecklist } from "./CommitChecklist.js";
+export type { CheckItem } from "./CommitChecklist.js";

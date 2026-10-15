@@ -1,16 +1,16 @@
 import { memo, useContext, useState } from "react";
 import { Handle, Position, useStore } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
-import type { Node, Artifact } from "../../api/types";
+import type { Node, Artifact } from "../../api/types.js";
 import type { ReactNode } from "react";
 import { FileText, Image, FileJson, Table, File, X } from "lucide-react";
 import { Lightbulb, Flask, Target, Scales, Circle as PhCircle } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { createPortal } from "react-dom";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
-import { MultiSelectContext } from "./GraphCanvas";
-import { Z } from "../../styles/tokens";
-import { ArtifactImage } from "../artifacts/ArtifactImage";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
+import { MultiSelectContext } from "./GraphCanvas.js";
+import { Z } from "../../styles/tokens.js";
+import { ArtifactImage } from "../artifacts/ArtifactImage.js";
 import {
   timeAgo,
   shortDateTime,
@@ -21,7 +21,7 @@ import {
   optimizeRunOf,
   formatScore,
   type OptimizeRun,
-} from "./orbit";
+} from "./orbit.js";
 
 interface ResearchNodeData {
   node: Node;

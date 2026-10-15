@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { GraphTag } from "../../api/types";
-import { TagBadge } from "./TagBadge";
+import type { GraphTag } from "../../api/types.js";
+import { TagBadge } from "./TagBadge.js";
 
 interface TagManagerProps {
   /** All tags available on the graph */

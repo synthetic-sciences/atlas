@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router-dom";
-import type { GraphTag, Node, SharingInfo } from "../../api/types";
+import type { GraphTag, Node, SharingInfo } from "../../api/types.js";
 
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
@@ -35,8 +35,8 @@ vi.mock("../../api/client", () => ({
   },
 }));
 
-import { nodesApi } from "../../api/nodes";
-import { NodeSidebar } from "./NodeSidebar";
+import { nodesApi } from "../../api/nodes.js";
+import { NodeSidebar } from "./NodeSidebar.js";
 
 const sharingInfo: SharingInfo = {
   node_id: "root-1",

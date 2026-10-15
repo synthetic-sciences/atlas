@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Node } from "../../api/types";
+import type { Node } from "../../api/types.js";
 
 const MONO = "'JetBrains Mono', monospace";
 const SANS = "'Computer Modern', 'Latin Modern Roman', Georgia, 'Times New Roman', serif";

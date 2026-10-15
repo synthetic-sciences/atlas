@@ -1,4 +1,4 @@
-import type { GraphTag } from "../../api/types";
+import type { GraphTag } from "../../api/types.js";
 
 interface TagBadgeProps {
   tag: GraphTag;

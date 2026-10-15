@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useNodeStore } from "../../stores/nodeStore";
-import { api } from "../../api/client";
+import { useNodeStore } from "../../stores/nodeStore.js";
+import { api } from "../../api/client.js";
 import { ArrowLeft } from "lucide-react";
-import { NodeEditor } from "../node/NodeEditor";
-import { NodeSidebar } from "../node/NodeSidebar";
-import { getChecklist } from "../node/CommitChecklist";
-import { ErrorAlert, IconButton, LoadingSpinner, Button } from "../shared";
-import { FONT_MONO, ICON_SIZE, Z } from "../../styles/tokens";
-import { useConfirm } from "../../lib/useConfirm";
-import { useToast } from "../../lib/useToast";
-import { errorMessage } from "../../lib/errors";
-import type { Artifact } from "../../api/types";
+import { NodeEditor } from "../node/NodeEditor.js";
+import { NodeSidebar } from "../node/NodeSidebar.js";
+import { getChecklist } from "../node/CommitChecklist.js";
+import { ErrorAlert, IconButton, LoadingSpinner, Button } from "../shared/index.js";
+import { FONT_MONO, ICON_SIZE, Z } from "../../styles/tokens.js";
+import { useConfirm } from "../../lib/useConfirm.js";
+import { useToast } from "../../lib/useToast.js";
+import { errorMessage } from "../../lib/errors.js";
+import type { Artifact } from "../../api/types.js";
 
 const EMPTY_ARTIFACTS: Artifact[] = [];
 

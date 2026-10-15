@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Atlas research graph CLI",
   "type": "module",
   "bin": {

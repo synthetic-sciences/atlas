@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
-import type { nodesApi } from "./api/nodes";
-import { configureGraphFeatures } from "./lib/config";
+import type { nodesApi } from "./api/nodes.js";
+import { configureGraphFeatures } from "./lib/config.js";
 
 export interface ReadOptions {
   fresh?: boolean;

@@ -1,4 +1,4 @@
-import type { Node, NodeOutcome } from "../../api/types";
+import type { Node, NodeOutcome } from "../../api/types.js";
 
 /**
  * Color + child helpers for the orbit / timeline graph styles (OrbitGraph).

@@ -1,4 +1,4 @@
-export { Dashboard } from "./Dashboard";
-export { SpotlightSearch } from "./SpotlightSearch";
-export { FloatingActionButton } from "./FloatingActionButton";
-export { GraphListPanel } from "./GraphListPanel";
+export { Dashboard } from "./Dashboard.js";
+export { SpotlightSearch } from "./SpotlightSearch.js";
+export { FloatingActionButton } from "./FloatingActionButton.js";
+export { GraphListPanel } from "./GraphListPanel.js";

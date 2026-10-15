@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
-import { useUIStore } from "../../stores/uiStore";
-import type { Toast } from "../../stores/uiStore";
-import { FONT_MONO, RADIUS, Z } from "../../styles/tokens";
+import { useUIStore } from "../../stores/uiStore.js";
+import type { Toast } from "../../stores/uiStore.js";
+import { FONT_MONO, RADIUS, Z } from "../../styles/tokens.js";
 
 const borderColor: Record<Toast["type"], string> = {
   error: "var(--color-error)",

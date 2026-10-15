@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { atlasUIHost } from "../../runtime";
+import { atlasUIHost } from "../../runtime.js";
 
 export function Layout({ children }: { children: ReactNode }) {
   const Shell = atlasUIHost().Shell;

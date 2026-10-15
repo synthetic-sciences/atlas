@@ -1,16 +1,16 @@
 import React, { useEffect, useState, useCallback, useMemo, Suspense } from "react";
-import { useNodeStore } from "../../stores/nodeStore";
-import { Layout } from "../Layout";
-import { SpotlightSearch } from "./SpotlightSearch";
-import { FloatingActionButton } from "./FloatingActionButton";
-import { GraphListPanel } from "./GraphListPanel";
-import type { ViewMode } from "./ViewModeToggle";
-import type { GraphStyle } from "../graph/useGraphLayout";
-import { GraphSkeleton } from "../shared/Skeletons";
-import { safeLocalStorage } from "../../lib/safeStorage";
+import { useNodeStore } from "../../stores/nodeStore.js";
+import { Layout } from "../Layout/index.js";
+import { SpotlightSearch } from "./SpotlightSearch.js";
+import { FloatingActionButton } from "./FloatingActionButton.js";
+import { GraphListPanel } from "./GraphListPanel.js";
+import type { ViewMode } from "./ViewModeToggle.js";
+import type { GraphStyle } from "../graph/useGraphLayout.js";
+import { GraphSkeleton } from "../shared/Skeletons.js";
+import { safeLocalStorage } from "../../lib/safeStorage.js";
 
 const GraphCanvas = React.lazy(() =>
-  import("../graph/GraphCanvas").then((m) => ({ default: m.GraphCanvas }))
+  import("../graph/GraphCanvas.js").then((m) => ({ default: m.GraphCanvas }))
 );
 
 const VIEW_MODE_KEY = "dashboard.viewMode";
@@ -59,7 +59,7 @@ export function Dashboard() {
     // so the user doesn't pay JS-chunk load + tree load serially. The
     // import is the same one ``React.lazy`` does at line 11; the
     // browser dedupes it.
-    import("../graph/GraphCanvas").catch(() => {
+    import("../graph/GraphCanvas.js").catch(() => {
       /* network jitter - React.lazy will retry on actual render */
     });
   }, [fetchNodes]);

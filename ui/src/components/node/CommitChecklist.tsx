@@ -1,5 +1,5 @@
 import React from "react";
-import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens";
+import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens.js";
 
 export interface CheckItem {
   key: string;

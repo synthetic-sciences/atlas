@@ -4,7 +4,7 @@
  */
 
 import type { CSSProperties } from "react";
-import { FONT_MONO } from "../../styles/tokens";
+import { FONT_MONO } from "../../styles/tokens.js";
 
 // ---------------------------------------------------------------------------
 // Keyframes - injected once via <style>

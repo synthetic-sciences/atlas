@@ -1,7 +1,7 @@
-import { useUIStore } from "../../stores/uiStore";
-import { Modal } from "./Modal";
-import { Button } from "./Button";
-import { FONT_SANS } from "../../styles/tokens";
+import { useUIStore } from "../../stores/uiStore.js";
+import { Modal } from "./Modal.js";
+import { Button } from "./Button.js";
+import { FONT_SANS } from "../../styles/tokens.js";
 
 export function ConfirmDialog() {
   const req = useUIStore((s) => s.confirmRequest);

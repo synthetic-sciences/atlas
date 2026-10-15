@@ -14,14 +14,14 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useNavigate } from "react-router-dom";
 
-import { ResearchNodeCard } from "./ResearchNodeCard";
-import { GroupFrameNode } from "./GroupFrameNode";
-import { OrbitGraph } from "./OrbitGraph";
-import { useGraphLayout, type GraphStyle } from "./useGraphLayout";
-import { useNodeStore } from "../../stores/nodeStore";
-import { api } from "../../api/client";
-import type { NodeTreeResponse } from "../../api/types";
-import { useToast } from "../../lib/useToast";
+import { ResearchNodeCard } from "./ResearchNodeCard.js";
+import { GroupFrameNode } from "./GroupFrameNode.js";
+import { OrbitGraph } from "./OrbitGraph.js";
+import { useGraphLayout, type GraphStyle } from "./useGraphLayout.js";
+import { useNodeStore } from "../../stores/nodeStore.js";
+import { api } from "../../api/client.js";
+import type { NodeTreeResponse } from "../../api/types.js";
+import { useToast } from "../../lib/useToast.js";
 
 export const MultiSelectContext = React.createContext<Set<string>>(new Set());
 

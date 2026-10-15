@@ -1,5 +1,5 @@
-import { BASE_URL } from "../lib/config";
-import { atlasUIHost, type ReadOptions } from "../runtime";
+import { BASE_URL } from "../lib/config.js";
+import { atlasUIHost, type ReadOptions } from "../runtime.js";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

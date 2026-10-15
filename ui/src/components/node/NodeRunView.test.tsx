@@ -12,7 +12,7 @@ vi.mock("../shared/MarkdownRenderer", () => ({
   MarkdownRenderer: () => null,
 }));
 
-import { NodeRunView } from "./NodeRunView";
+import { NodeRunView } from "./NodeRunView.js";
 
 beforeEach(() => {
   mockFetchArtifactText.mockReset().mockResolvedValue("result body");

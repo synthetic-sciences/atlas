@@ -1,7 +1,7 @@
 import dagre from "dagre";
 import type { Node as RFNode, Edge as RFEdge } from "@xyflow/react";
-import type { Node } from "../../api/types";
-import { scoreOf } from "./orbit";
+import type { Node } from "../../api/types.js";
+import { scoreOf } from "./orbit.js";
 
 /**
  * Adaptive graph layout engine.

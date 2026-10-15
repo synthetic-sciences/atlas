@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { FONT_SANS, ICON_SIZE, Z } from "../../styles/tokens";
+import { FONT_SANS, ICON_SIZE, Z } from "../../styles/tokens.js";
 
 interface ModalProps {
   open: boolean;

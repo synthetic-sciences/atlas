@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
-import { NodeRunView } from "./NodeRunView";
-import { NodeStructured } from "./NodeStructured";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
+import { NodeRunView } from "./NodeRunView.js";
+import { NodeStructured } from "./NodeStructured.js";
 import { Pencil, Lock, Check, Plus, X } from "lucide-react";
-import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens";
-import type { Artifact } from "../../api/types";
+import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens.js";
+import type { Artifact } from "../../api/types.js";
 
 /* ── shared style fragments ── */
 

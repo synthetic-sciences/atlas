@@ -12,7 +12,7 @@ import {
 import { select } from "d3-selection";
 import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from "d3-zoom";
 import { Maximize, Minus, Plus } from "lucide-react";
-import type { Node, NodeTreeResponse } from "../../api/types";
+import type { Node, NodeTreeResponse } from "../../api/types.js";
 import {
   outcomeColor,
   kindColor,
@@ -23,7 +23,7 @@ import {
   scorecardOf,
   scorecardSegments,
   type Scorecard,
-} from "./orbit";
+} from "./orbit.js";
 
 /**
  * Bespoke d3 graph for the "orbit" style. Restrained, Flywheel-like: small

@@ -1,5 +1,5 @@
-import { FONT_MONO as mono, FONT_SANS as serif } from "../../styles/tokens";
-import { parseSemanticData, scoreOf, scorecardOf } from "../graph/orbit";
+import { FONT_MONO as mono, FONT_SANS as serif } from "../../styles/tokens.js";
+import { parseSemanticData, scoreOf, scorecardOf } from "../graph/orbit.js";
 
 /**
  * NodeStructured — surfaces a node's structured payload above the freeform

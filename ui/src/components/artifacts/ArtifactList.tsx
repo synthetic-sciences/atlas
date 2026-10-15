@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Artifact, ArtifactType } from "../../api/types";
-import { FilePreviewModal, type PreviewItem } from "../shared/FilePreviewModal";
+import type { Artifact, ArtifactType } from "../../api/types.js";
+import { FilePreviewModal, type PreviewItem } from "../shared/FilePreviewModal.js";
 
 interface ArtifactListProps {
   artifacts: Artifact[];

@@ -1,2 +1,2 @@
-export { TagBadge } from "./TagBadge";
-export { TagManager } from "./TagManager";
+export { TagBadge } from "./TagBadge.js";
+export { TagManager } from "./TagManager.js";

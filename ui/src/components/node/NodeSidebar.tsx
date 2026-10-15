@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { api } from "../../api/client";
+import { api } from "../../api/client.js";
 import type {
   Artifact,
   AuditEvent,
@@ -9,12 +9,12 @@ import type {
   ArtifactType,
   Collaborator,
   GraphTag,
-} from "../../api/types";
-import { ArtifactList } from "../artifacts/ArtifactList";
-import { ExportPanel } from "../export/ExportPanel";
-import { SharingPanel } from "../sharing/SharingPanel";
-import { TagManager } from "../tags/TagManager";
-import { BASE_URL } from "../../lib/config";
+} from "../../api/types.js";
+import { ArtifactList } from "../artifacts/ArtifactList.js";
+import { ExportPanel } from "../export/ExportPanel.js";
+import { SharingPanel } from "../sharing/SharingPanel.js";
+import { TagManager } from "../tags/TagManager.js";
+import { BASE_URL } from "../../lib/config.js";
 import {
   GitBranch,
   Check,
@@ -28,10 +28,10 @@ import {
   Download,
   Gauge,
 } from "lucide-react";
-import { CommitChecklist, type CheckItem } from "./CommitChecklist";
-import { errorMessage } from "../../lib/errors";
-import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens";
-import { timeAgo, optimizeRunOf, formatScore, type OptimizeRun } from "../graph/orbit";
+import { CommitChecklist, type CheckItem } from "./CommitChecklist.js";
+import { errorMessage } from "../../lib/errors.js";
+import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens.js";
+import { timeAgo, optimizeRunOf, formatScore, type OptimizeRun } from "../graph/orbit.js";
 const labelStyle: React.CSSProperties = {
   fontFamily: sans,
   fontSize: 11,

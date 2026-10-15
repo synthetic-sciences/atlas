@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Artifact } from "../../api/types";
-import { MarkdownRenderer } from "../shared/MarkdownRenderer";
-import { fetchArtifactText } from "../../lib/artifactContent";
-import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens";
+import type { Artifact } from "../../api/types.js";
+import { MarkdownRenderer } from "../shared/MarkdownRenderer.js";
+import { fetchArtifactText } from "../../lib/artifactContent.js";
+import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens.js";
 
 /**
  * NodeRunView — status banner + tabbed body (Result · Logs · Details).

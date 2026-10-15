@@ -1,5 +1,5 @@
-import { atlasUIHost } from "../runtime";
-import { useUIStore } from "../stores/uiStore";
+import { atlasUIHost } from "../runtime.js";
+import { useUIStore } from "../stores/uiStore.js";
 
 export function useToast() {
   const callback = atlasUIHost().useToast;

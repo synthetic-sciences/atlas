@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { getApiHeadersAsync } from "../../api/client";
-import { BASE_URL } from "../../lib/config";
+import { getApiHeadersAsync } from "../../api/client.js";
+import { BASE_URL } from "../../lib/config.js";
 
 interface ArtifactImageProps {
   src?: string | null;

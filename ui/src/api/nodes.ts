@@ -11,8 +11,8 @@ import type {
   NodeTreeResponse,
   RemoveParentRequest,
   SharingInfo,
-} from "./types";
-import { getAuthHeaders, publicRequest, qs, request, BASE_URL } from "./internal";
+} from "./types.js";
+import { getAuthHeaders, publicRequest, qs, request, BASE_URL } from "./internal.js";
 
 export interface PublicRepoEntry {
   name: string;

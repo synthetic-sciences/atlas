@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import type { Node } from "../../api/types";
+import type { Node } from "../../api/types.js";
 
 // Mock @xyflow/react Handle + Position — they need a React Flow internal
 // context that we don't want to set up in unit tests.
@@ -36,7 +36,7 @@ vi.mock("../artifacts/ArtifactImage", () => ({
   ArtifactImage: () => null,
 }));
 
-import { ResearchNodeCard } from "./ResearchNodeCard";
+import { ResearchNodeCard } from "./ResearchNodeCard.js";
 
 function makeNode(overrides: Partial<Node> = {}): Node {
   return {

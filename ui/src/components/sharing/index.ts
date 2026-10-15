@@ -1,1 +1,1 @@
-export { SharingPanel } from "./SharingPanel";
+export { SharingPanel } from "./SharingPanel.js";

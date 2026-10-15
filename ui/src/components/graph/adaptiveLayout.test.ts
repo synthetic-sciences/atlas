@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { Node } from "../../api/types";
+import type { Node } from "../../api/types.js";
 import type { Node as RFNode, Edge as RFEdge } from "@xyflow/react";
-import { profileGraph, groupValueOf, layoutAdaptive } from "./adaptiveLayout";
+import { profileGraph, groupValueOf, layoutAdaptive } from "./adaptiveLayout.js";
 
 function mk(id: string, over: Partial<Node>): Node {
   return {

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Modal } from "./Modal";
-import { MarkdownRenderer } from "./MarkdownRenderer";
-import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens";
-import { fetchArtifactText, openOrDownloadArtifact } from "../../lib/artifactContent";
-import { getAuthHeaders } from "../../api/internal";
+import { Modal } from "./Modal.js";
+import { MarkdownRenderer } from "./MarkdownRenderer.js";
+import { FONT_MONO as mono, FONT_SANS as sans } from "../../styles/tokens.js";
+import { fetchArtifactText, openOrDownloadArtifact } from "../../lib/artifactContent.js";
+import { getAuthHeaders } from "../../api/internal.js";
 
 /**
  * FilePreviewModal — a proper in-app file viewer.

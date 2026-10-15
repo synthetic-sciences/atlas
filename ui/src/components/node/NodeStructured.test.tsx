@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { NodeStructured } from "./NodeStructured";
+import { NodeStructured } from "./NodeStructured.js";
 
 describe("NodeStructured", () => {
   it("surfaces an empirical run's headline metric and code state", () => {

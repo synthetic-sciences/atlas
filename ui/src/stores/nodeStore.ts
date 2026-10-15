@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { api } from "../api/client";
-import type { AuditEvent, Node, NodeTreeResponse } from "../api/types";
+import { api } from "../api/client.js";
+import type { AuditEvent, Node, NodeTreeResponse } from "../api/types.js";
 
 // Per-anchor in-flight tree fetches. Module-scoped so StrictMode dev
 // double-mounts and concurrent components share the same network call.

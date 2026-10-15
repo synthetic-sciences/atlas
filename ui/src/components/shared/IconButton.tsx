@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { ICON_SIZE } from "../../styles/tokens";
+import { ICON_SIZE } from "../../styles/tokens.js";
 
 type Size = keyof typeof ICON_SIZE;
 

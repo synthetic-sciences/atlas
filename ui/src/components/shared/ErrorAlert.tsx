@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { AlertCircle, AlertTriangle } from "lucide-react";
-import { FONT_MONO, ICON_SIZE, RADIUS } from "../../styles/tokens";
+import { FONT_MONO, ICON_SIZE, RADIUS } from "../../styles/tokens.js";
 
 interface ErrorAlertProps {
   message: string;

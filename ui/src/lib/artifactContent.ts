@@ -1,5 +1,5 @@
-import { BASE_URL } from "./config";
-import { getAuthHeaders } from "../api/internal";
+import { BASE_URL } from "./config.js";
+import { getAuthHeaders } from "../api/internal.js";
 
 /**
  * Resolve the textual body of an artifact.

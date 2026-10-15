@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
-import type { Collaborator, SharingInfo, SharingMode } from "../../api/types";
-import { FEATURE_PUBLIC_GRAPHS } from "../../lib/config";
-import { FONT_MONO as mono } from "../../styles/tokens";
+import type { Collaborator, SharingInfo, SharingMode } from "../../api/types.js";
+import { FEATURE_PUBLIC_GRAPHS } from "../../lib/config.js";
+import { FONT_MONO as mono } from "../../styles/tokens.js";
 
 interface SharingPanelProps {
   sharingInfo: SharingInfo;

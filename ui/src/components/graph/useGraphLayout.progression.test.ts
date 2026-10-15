@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useGraphLayout } from "./useGraphLayout";
-import type { Node, NodeTreeResponse } from "../../api/types";
+import { useGraphLayout } from "./useGraphLayout.js";
+import type { Node, NodeTreeResponse } from "../../api/types.js";
 
 function mk(id: string, over: Partial<Node>): Node {
   return {

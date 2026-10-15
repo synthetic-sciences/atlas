@@ -1,2 +1,2 @@
-export { ArtifactViewer } from "./ArtifactViewer";
-export { ArtifactList } from "./ArtifactList";
+export { ArtifactViewer } from "./ArtifactViewer.js";
+export { ArtifactList } from "./ArtifactList.js";

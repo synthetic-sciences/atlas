@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, FileJson, FilePlus } from "lucide-react";
-import { useNodeStore } from "../../stores/nodeStore";
-import { api } from "../../api/client";
+import { useNodeStore } from "../../stores/nodeStore.js";
+import { api } from "../../api/client.js";
 
 const SANS = "'Computer Modern', 'Latin Modern Roman', Georgia, 'Times New Roman', serif";
 const HOVER_TRANSITION = "background 120ms ease, color 120ms ease, border-color 120ms ease";

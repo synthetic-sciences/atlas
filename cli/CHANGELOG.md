@@ -2,7 +2,12 @@
 
 All notable changes to `@synsci/atlas` are documented here.
 
-## Unreleased
+## [0.16.0] - 2026-10-15
+
+- Move CLI source and npm release ownership into the private Atlas repository.
+- Publish the graph CLI under Apache-2.0, independently of React UI dependencies.
+- Preserve command names, profiles, authentication, and hosted wire contracts.
+- Fix project listing so custom-titled roots are included and child notes are excluded.
 
 ### Removed — Atlas agent-skill distribution
 

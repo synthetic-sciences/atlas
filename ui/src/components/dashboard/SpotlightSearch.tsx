@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
-import { nodesApi } from "../../api/nodes";
-import type { Node } from "../../api/types";
+import { nodesApi } from "../../api/nodes.js";
+import type { Node } from "../../api/types.js";
 
 const MONO = "'JetBrains Mono', monospace";
 const SANS = "'Computer Modern', 'Latin Modern Roman', Georgia, 'Times New Roman', serif";

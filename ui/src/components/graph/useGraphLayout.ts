@@ -1,8 +1,8 @@
 import { useMemo, useRef } from "react";
 import type { Node as RFNode, Edge as RFEdge } from "@xyflow/react";
-import type { Node, NodeTreeResponse } from "../../api/types";
-import { computeSegments } from "./orbit";
-import { layoutAdaptive } from "./adaptiveLayout";
+import type { Node, NodeTreeResponse } from "../../api/types.js";
+import { computeSegments } from "./orbit.js";
+import { layoutAdaptive } from "./adaptiveLayout.js";
 
 export type GraphStyle = "cards" | "orbit" | "timeline";
 
