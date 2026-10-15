@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Atlas research graph CLI",
   "type": "module",
   "bin": {
@@ -24,8 +24,9 @@
     "ai-agents"
   ],
   "author": {
-    "name": "InkVell Inc. (dba Synthetic Sciences)",
-    "email": "support@sayntheticsciences.ai"
+    "name": "InkVell Inc.",
+    "email": "support@sayntheticsciences.ai",
+    "url": "https://tryatlas.sh"
   },
   "license": "Apache-2.0",
   "repository": {
@@ -45,7 +46,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": false
+    "provenance": true
   },
   "bugs": {
     "email": "support@sayntheticsciences.ai"

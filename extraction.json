@@ -151,7 +151,7 @@
     "research_log_list",
     "research_log_search"
   ],
-  "visibility": "private GitHub source; public npm packages; existing hosted feature flags preserved",
+  "visibility": "public GitHub source and npm packages; existing hosted feature flags preserved",
   "backend_contract_tests": [
     "test_artifacts.py",
     "test_campaign_repo_ids.py",

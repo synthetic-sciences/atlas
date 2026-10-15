@@ -134,9 +134,9 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks,
 [AGENTS.md](AGENTS.md) records repository conventions. Pull requests are squash
 merged after their required checks pass.
 
-The npm packages are public. Source access is currently limited to repository
-collaborators; this repository remains private. Hosted service migration is
-tracked separately in [service separation](docs/service-separation.md).
+Source and npm packages are public under Apache-2.0. Hosted accounts, credentials,
+and research data remain private. Hosted service migration is tracked separately
+in [service separation](docs/service-separation.md).
 
 ## Contributing and security
 

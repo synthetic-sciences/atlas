@@ -15,8 +15,9 @@ command, and wire identifiers remain compatible. Account, billing, and managed
 provider commands require the hosted account service; local graph storage does
 not implement those services.
 
-Source and releases are maintained in Synthetic Sciences' private Atlas
-repository. This npm package is public and licensed under Apache-2.0.
+Source and releases are maintained in Synthetic Sciences' public
+[Atlas repository](https://github.com/synthetic-sciences/atlas).
+This npm package is licensed under Apache-2.0.
 
 Copyright 2026 InkVell Inc. (dba Synthetic Sciences).
 Contact: [support@sayntheticsciences.ai](mailto:support@sayntheticsciences.ai).

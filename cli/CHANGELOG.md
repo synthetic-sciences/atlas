@@ -2,6 +2,11 @@
 
 All notable changes to `@synsci/atlas` are documented here.
 
+## [0.16.2] - 2026-10-15
+
+- Link the public Atlas source and enable provenance for public releases.
+- Keep the company name and website in distinct npm author fields.
+
 ## [0.16.1] - 2026-10-15
 
 - Correct company attribution and the confirmed support contact.

@@ -2,8 +2,7 @@
 
 Atlas keeps research graphs useful across the terminal, API, and browser. Good
 contributions make those contracts clearer, more reliable, or easier to use.
-Source access is currently limited to repository collaborators. The CLI, SDK,
-and UI packages are public under Apache-2.0.
+Source and the CLI, SDK, and UI packages are public under Apache-2.0.
 
 ## Where to start
 
@@ -35,6 +34,12 @@ Use a scratch `ATLAS_DATA_DIR` when testing destructive operations. Supply
 credentials through your environment or secret store; never commit `.env`
 files, production data, API keys, or authentication state.
 See [server configuration](docs/development.md) for PostgreSQL and host adapters.
+
+The database files under `backend/src/atlas_graph/db/` define empty graph
+schemas and versioned migrations. Keep those source files. Local databases,
+backups, and hosted data exports must stay outside Git. The CI safety job rejects
+database snapshots and scans source history with Gitleaks; run
+`gitleaks git . --redact=100 --log-opts=--all --max-archive-depth=3` locally too.
 
 ## Development loops
 

@@ -70,7 +70,7 @@ jobs:
         env:
           ATLAS_PUBLISH: 'true'
         run: node scripts/publish-release.mjs
-      - name: Record private package release
+      - name: Record package release
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,6 +82,6 @@ jobs:
             test "$(cat /tmp/atlas-release-target)" = "$RELEASE_SHA"
           else
             gh release create "$tag" --target "$RELEASE_SHA" --title "Atlas npm release ${RELEASE_SHA:0:12}" \
-              --notes "Public CLI, SDK, and UI versions and artifact hashes are recorded in manifest.json. Source repository remains private." \
+              --notes "Public CLI, SDK, and UI versions and artifact hashes are recorded in manifest.json. Atlas source is public under Apache-2.0." \
               dist/releases/*.tgz dist/releases/manifest.json
           fi

@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas-sdk",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "Dependency-free JavaScript client for the Atlas graph API",
   "license": "Apache-2.0",
@@ -24,14 +24,15 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": false
+    "provenance": true
   },
   "engines": {
     "node": ">=18"
   },
   "author": {
-    "name": "InkVell Inc. (dba Synthetic Sciences)",
-    "email": "support@sayntheticsciences.ai"
+    "name": "InkVell Inc.",
+    "email": "support@sayntheticsciences.ai",
+    "url": "https://tryatlas.sh"
   },
   "bugs": {
     "email": "support@sayntheticsciences.ai"

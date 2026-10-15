@@ -19,7 +19,8 @@ include JSON `body`, `query`, `signal`, and `idempotencyKey`. Failed HTTP
 responses throw `AtlasError` with `status` and `body`. Mutations are never
 automatically retried. A token callback can supply refreshed credentials.
 
-Licensed under Apache-2.0. Source is maintained in the private Atlas repository.
+Licensed under Apache-2.0. Source is maintained in the public
+[Atlas repository](https://github.com/synthetic-sciences/atlas).
 
 Copyright 2026 InkVell Inc. (dba Synthetic Sciences).
 Contact: [support@sayntheticsciences.ai](mailto:support@sayntheticsciences.ai).
