@@ -54,9 +54,13 @@ async def optional_auth(request: Request) -> dict | None:
     return await get_current_user(request)
 
 
-async def get_db():
+async def get_db(request: Request):
     async with database() as db:
-        yield db
+        request.state.atlas_database = db
+        try:
+            yield db
+        finally:
+            del request.state.atlas_database
 
 
 # Retain dependency identity so an embedding application's existing FastAPI

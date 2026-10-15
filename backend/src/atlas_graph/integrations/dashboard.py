@@ -360,26 +360,35 @@ class Dashboard:
         if account.identity.user_id != account.profile.user_id:
             raise HTTPException(503, detail="Invalid account service identity")
         identity = account.identity.model_dump(mode="json")
-        profile = account.profile
-        async with get_db() as db:
-            await db.execute(
-                "INSERT INTO users (user_id,email,display_name,github_username,avatar_url,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?) ON CONFLICT (user_id) DO UPDATE SET "
-                "email=excluded.email,display_name=excluded.display_name,github_username=excluded.github_username,"
-                "avatar_url=excluded.avatar_url,updated_at=excluded.updated_at,deleted_at=NULL",
-                (
-                    identity["user_id"],
-                    f"{identity['user_id']}@atlas.invalid",
-                    profile.display_name,
-                    profile.github_username,
-                    profile.avatar_url,
-                    profile.created_at.isoformat(),
-                    profile.updated_at.isoformat(),
-                ),
-            )
-            await db.commit()
+        bound = getattr(request.state, "atlas_database", None)
+        if bound is not None:
+            await self.profile(bound, account)
+        else:
+            async with get_db() as db:
+                await self.profile(db, account)
         request.state.atlas_account_identity = identity
         return identity
+
+    @staticmethod
+    async def profile(db, account: Account) -> None:
+        user_id = str(account.identity.user_id)
+        profile = account.profile
+        await db.execute(
+            "INSERT INTO users (user_id,email,display_name,github_username,avatar_url,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?) ON CONFLICT (user_id) DO UPDATE SET "
+            "email=excluded.email,display_name=excluded.display_name,github_username=excluded.github_username,"
+            "avatar_url=excluded.avatar_url,updated_at=excluded.updated_at,deleted_at=NULL",
+            (
+                user_id,
+                f"{user_id}@atlas.invalid",
+                profile.display_name,
+                profile.github_username,
+                profile.avatar_url,
+                profile.created_at.isoformat(),
+                profile.updated_at.isoformat(),
+            ),
+        )
+        await db.commit()
 
     async def optional_auth(self, request: Request) -> dict | None:
         return (

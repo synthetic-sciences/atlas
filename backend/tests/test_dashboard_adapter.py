@@ -442,3 +442,23 @@ def test_hosted_indexing_requires_its_separate_credential(monkeypatch):
         monkeypatch.setenv("ATLAS_INDEX_SERVICE_TOKEN", value)
         with pytest.raises(RuntimeError, match="separate index service credential"):
             create_app()
+
+
+async def test_hosted_profile_reuses_the_database_already_bound_to_the_request(client, accounts, monkeypatch):
+    from contextlib import asynccontextmanager
+    from atlas_graph.integrations import dashboard
+
+    state, _, first, _, _ = accounts
+
+    @asynccontextmanager
+    async def extra():
+        raise AssertionError("Authentication must not acquire a second request database")
+        yield
+
+    monkeypatch.setattr(dashboard, "get_db", extra)
+    response = await client.get("/api/v1/projects", headers={"Authorization": "Bearer first"})
+    assert response.status_code == 200, response.text
+    assert len(state["calls"]) == 1
+    async with get_db() as db:
+        row = await (await db.execute("SELECT email FROM users WHERE user_id=?", (first,))).fetchone()
+    assert row[0] == f"{first}@atlas.invalid"
