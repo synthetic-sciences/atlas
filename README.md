@@ -150,3 +150,6 @@ billing, and credential details belong in private support channels.
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Copyright 2026 InkVell Inc. (dba Synthetic Sciences).<br/>
+Contact: [support@sayntheticsciences.ai](mailto:support@sayntheticsciences.ai).

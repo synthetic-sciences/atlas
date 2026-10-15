@@ -2,6 +2,11 @@
 
 All notable changes to `@synsci/atlas` are documented here.
 
+## [0.16.1] - 2026-10-15
+
+- Correct company attribution and the confirmed support contact.
+- Include the copyright and attribution notice in the npm package.
+
 ## [0.16.0] - 2026-10-15
 
 - Move CLI source and npm release ownership into the private Atlas repository.

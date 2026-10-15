@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Dependency-free JavaScript client for the Atlas graph API",
   "license": "Apache-2.0",
@@ -14,7 +14,8 @@
     "index.mjs",
     "index.d.ts",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "repository": {
     "type": "git",
@@ -27,5 +28,12 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "author": {
+    "name": "InkVell Inc. (dba Synthetic Sciences)",
+    "email": "support@sayntheticsciences.ai"
+  },
+  "bugs": {
+    "email": "support@sayntheticsciences.ai"
   }
 }

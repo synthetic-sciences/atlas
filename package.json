@@ -38,5 +38,9 @@
     "cli",
     "ui",
     "sdk"
-  ]
+  ],
+  "author": {
+    "name": "InkVell Inc. (dba Synthetic Sciences)",
+    "email": "support@sayntheticsciences.ai"
+  }
 }

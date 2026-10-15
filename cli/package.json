@@ -1,6 +1,6 @@
 {
   "name": "@synsci/atlas",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Atlas research graph CLI",
   "type": "module",
   "bin": {
@@ -12,7 +12,8 @@
     "src/atlas-cli.mjs",
     "src/atlas-runtime/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "keywords": [
     "atlas",
@@ -22,7 +23,10 @@
     "dag",
     "ai-agents"
   ],
-  "author": "Synthetic Sciences",
+  "author": {
+    "name": "InkVell Inc. (dba Synthetic Sciences)",
+    "email": "support@sayntheticsciences.ai"
+  },
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -42,5 +46,8 @@
   "publishConfig": {
     "access": "public",
     "provenance": false
+  },
+  "bugs": {
+    "email": "support@sayntheticsciences.ai"
   }
 }
