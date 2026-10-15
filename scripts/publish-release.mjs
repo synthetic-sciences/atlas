@@ -24,7 +24,7 @@ for (const item of manifest.packages) {
   }
   const error = JSON.parse(existing.stdout || "{}").error;
   assert.equal(error?.code, "E404", `Registry lookup failed for ${spec}: ${error?.code || existing.status}`);
-  execFileSync("npm", ["publish", archive, "--access", "public", "--provenance=false", ...(!publish ? ["--dry-run"] : [])], { stdio: "inherit" });
+  execFileSync("npm", ["publish", archive, "--access", "public", `--provenance=${publish}`, ...(!publish ? ["--dry-run"] : [])], { stdio: "inherit" });
   if (!publish) continue;
   console.log(`Waiting for registry processing of ${spec}`);
   await waitForPackage(item.name, item.version, item.integrity);

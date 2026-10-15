@@ -23,6 +23,19 @@ Report authorization bypasses, unintended data exposure, unsafe file handling,
 credential leaks, and integrity failures through the private channel above.
 Include the relevant host configuration without its secret values.
 
+## Database source
+
+The SQL files in `backend/src/atlas_graph/db/` define empty graph schemas and
+versioned migrations. They are required to initialize and upgrade Atlas.
+Hosted database contents, account credentials, and customer exports do not
+belong in this repository. Local database files and backups are ignored, and
+CI rejects tracked database snapshots and scans Git history for credentials.
+
+The graph profile table holds author display fields; it is not the hosted
+account authentication database. Dashboard owns account identity, provider
+grants, organizations, and Wallet records. Keep those boundaries when adding
+fields or migration tools.
+
 ## Versions
 
 Report against the latest released version of the affected npm package, or name

@@ -40,7 +40,8 @@
     "sdk"
   ],
   "author": {
-    "name": "InkVell Inc. (dba Synthetic Sciences)",
-    "email": "support@sayntheticsciences.ai"
+    "name": "InkVell Inc.",
+    "email": "support@sayntheticsciences.ai",
+    "url": "https://tryatlas.sh"
   }
 }

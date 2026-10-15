@@ -1,7 +1,7 @@
 # Atlas releases
 
 Atlas owns the public npm releases for `@synsci/atlas`, `@synsci/atlas-sdk`, and
-`@synsci/atlas-ui`. The source repository remains private. Package publication
+`@synsci/atlas-ui`. The source repository is public under Apache-2.0. Package publication
 does not launch hosted features or change graph access.
 
 ## Verification
@@ -27,10 +27,10 @@ publicly and records their hashes.
 
 The `npm` GitHub environment authenticates through each package's npm trusted
 publisher, restricted to `synthetic-sciences/atlas` and `release-npm.yml`.
-No npm publishing token is stored in Actions. Private repositories cannot
-generate npm provenance; the release manifest records artifact integrity.
+No npm publishing token is stored in Actions. Public releases enable npm
+provenance; the release manifest also records artifact integrity.
 
-Private GitHub release records use `npm-<source commit>` and attach the checked
+GitHub release records use `npm-<source commit>` and attach the checked
 manifest and tarballs. SDK and UI versions can advance independently of the CLI.
 Existing release tags and published package contents remain immutable.
 

@@ -5,8 +5,8 @@ the graph API, CLI, SDK, and graph UI. Account identity, organizations, billing,
 managed inference/search, credentials, telemetry, and product administration
 belong to `synthetic-sciences/dashboard` and enter through host adapters.
 
-Preserve the existing graph UI and hidden/public feature flags. GitHub stays
-private. CLI, SDK, and UI packages are public npm releases under Apache-2.0.
+Preserve the existing graph UI and hidden/public feature flags. GitHub source
+and CLI, SDK, and UI npm packages are public under Apache-2.0.
 Publication does not enable anonymous graph access, launch hidden hosted
 features, or restore retired compute or agent services.
 
@@ -30,3 +30,8 @@ Company details are InkVell Inc. (dba Synthetic Sciences), copyright 2026.
 The confirmed contact is support@sayntheticsciences.ai, with that exact spelling.
 Do not invent separate security, conduct, careers, or legal contact addresses.
 Preserve third-party authorship and notices.
+
+Database source contains empty graph schemas and versioned migrations, not
+hosted account data. Never commit local databases, snapshots, or exports.
+Run the redacted full-history Gitleaks check before publishing source changes.
+Any scanner exception must identify a reviewed false positive precisely.
