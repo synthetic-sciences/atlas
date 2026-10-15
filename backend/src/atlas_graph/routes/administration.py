@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -13,6 +14,8 @@ from pydantic import BaseModel, Field
 from atlas_graph import config
 from atlas_graph.dependencies import get_db
 from atlas_graph.services import administration
+from atlas_graph.auth.access_check import check_node_access
+from atlas_graph.services import research_log_service
 
 
 def credential() -> str:
@@ -48,6 +51,49 @@ router = APIRouter(
     dependencies=[Depends(authorize)],
     include_in_schema=False,
 )
+
+
+class Access(BaseModel):
+    actor: UUID
+    node_id: UUID
+    require: Literal["view", "write", "admin"] = "view"
+
+
+@router.post("/graph-access")
+async def access(body: Access, db=Depends(get_db)):
+    return {
+        "allowed": await check_node_access(
+            db, str(body.actor), str(body.node_id), body.require
+        )
+    }
+
+
+class Log(BaseModel):
+    actor: UUID
+    project_id: UUID
+    entry_type: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=300)
+    body: str | None = Field(None, max_length=1_048_576)
+    refs: list[dict] = Field(default_factory=list, max_length=100)
+
+
+@router.post("/research-log")
+async def log(body: Log, db=Depends(get_db)):
+    if (
+        await check_node_access(db, str(body.actor), str(body.project_id), "write")
+        is not True
+    ):
+        return {"appended": False}
+    entry = await research_log_service.append(
+        db,
+        project_id=str(body.project_id),
+        entry_type=body.entry_type,
+        title=body.title,
+        body=body.body,
+        refs=body.refs,
+        created_by=str(body.actor),
+    )
+    return {"appended": True, "entry": entry}
 
 
 @router.get("/summary")

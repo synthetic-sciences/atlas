@@ -325,3 +325,14 @@ account keys, and graph rows/blob bytes survive a container restart. The old
 account schema receives no graph rows. The image CI contract separately checks
 non-root SQLite operation, authenticated project creation/read, hidden feature
 404s, and graph-owned blob writes.
+
+Private Dashboard web operations can use the same fixed host boundary to ask
+for graph access and append provenance. Dashboard supplies the actor from its
+current authenticated identity; client body fields cannot choose it. The graph
+service checks current node/root ACL and collaboration policy before any log
+write. Viewer and revoked/downgraded collaborator requests append nothing. This
+service assertion avoids a circular identity callback while Dashboard holds a
+private database connection. The credential remains private to Dashboard and
+Atlas; the public gateway cannot reach these internal routes. Account policy
+callbacks use Dashboard's existing reserved control pool, so a busy primary
+pool cannot starve the callback needed to finish an authorized graph effect.
