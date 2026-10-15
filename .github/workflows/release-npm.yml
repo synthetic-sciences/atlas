@@ -70,17 +70,18 @@ jobs:
         env:
           ATLAS_PUBLISH: 'true'
         run: node scripts/publish-release.mjs
-      - name: Record private source release
+      - name: Record private package release
         if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(node -p "JSON.parse(require('fs').readFileSync('cli/package.json')).version")
-          tag="v$version"
+          # SDK and UI versions can advance while the CLI stays unchanged.
+          # The immutable source commit identifies the complete package bundle.
+          tag="npm-$RELEASE_SHA"
           if gh release view "$tag" --json targetCommitish --jq .targetCommitish > /tmp/atlas-release-target; then
             test "$(cat /tmp/atlas-release-target)" = "$RELEASE_SHA"
           else
-            gh release create "$tag" --target "$RELEASE_SHA" --title "Atlas $version" \
-              --notes "Public npm CLI, SDK, and UI packages. Source repository remains private." \
+            gh release create "$tag" --target "$RELEASE_SHA" --title "Atlas npm release ${RELEASE_SHA:0:12}" \
+              --notes "Public CLI, SDK, and UI versions and artifact hashes are recorded in manifest.json. Source repository remains private." \
               dist/releases/*.tgz dist/releases/manifest.json
           fi
