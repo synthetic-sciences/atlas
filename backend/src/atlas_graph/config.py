@@ -41,14 +41,20 @@ def __getattr__(name: str):
         "BLOBS_DIR": directory / "blobs",
         "DB_PATH": directory / "atlas.db",
         "DATABASE_URL": database,
+        "DATABASE_SCHEMA": os.environ.get("ATLAS_DATABASE_SCHEMA", "public"),
         "USE_POSTGRES": bool(database),
-        "PUBLIC_GRAPHS_ENABLED": os.environ.get("ATLAS_PUBLIC_GRAPHS_ENABLED", "false").lower() == "true",
+        "PUBLIC_GRAPHS_ENABLED": os.environ.get(
+            "ATLAS_PUBLIC_GRAPHS_ENABLED", "false"
+        ).lower()
+        == "true",
         "SERVER_URL": os.environ.get("ATLAS_SERVER_URL", "http://127.0.0.1:8002"),
         "SIGNED_URL_TTL_SECONDS": 3600,
         "BATCH_TOKEN_TTL_SECONDS": 900,
         "MAX_UPLOAD_BYTES": 10_485_760,
         "SUPABASE_URL": os.environ.get("ATLAS_SUPABASE_URL", ""),
-        "SUPABASE_SERVICE_ROLE_KEY": os.environ.get("ATLAS_SUPABASE_SERVICE_ROLE_KEY", ""),
+        "SUPABASE_SERVICE_ROLE_KEY": os.environ.get(
+            "ATLAS_SUPABASE_SERVICE_ROLE_KEY", ""
+        ),
         "SUPABASE_JWT_SECRET": None,
         "SUPABASE_STORAGE_BUCKET": os.environ.get("ATLAS_STORAGE_BUCKET", "blobs"),
         "GITHUB_TOKEN": os.environ.get("GITHUB_TOKEN", ""),
@@ -61,4 +67,3 @@ def __getattr__(name: str):
     if name == "SUPABASE_JWT_SECRET":
         return _signing_secret(directory)
     return values[name]
-

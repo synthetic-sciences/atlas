@@ -318,6 +318,49 @@ async def test_transfer_refuses_private_target_schema(databases):
         await transfer(source, target)
 
 
+async def test_transfer_between_isolated_schemas_keeps_private_source_data(databases):
+    source, _, _ = databases
+    owner, *_ = await seed(source)
+    parsed = urlsplit(os.environ["ATLAS_TEST_PG_DSN"])
+    name = await source.fetchval("SELECT current_database()")
+    target = await asyncpg.connect(urlunsplit(parsed._replace(path=f"/{name}")))
+    try:
+        await target.execute("CREATE SCHEMA graph; SET search_path TO graph,public")
+        schema = (
+            files("atlas_graph.db")
+            .joinpath("schema.pg.sql")
+            .read_text()
+            .replace("public.", "graph.")
+            .replace("graph.vector", "public.vector")
+        )
+        await target.execute(schema)
+        await target.execute(
+            "CREATE TABLE graph.atlas_schema_versions (version integer PRIMARY KEY); INSERT INTO graph.atlas_schema_versions VALUES (1)"
+        )
+        report = await transfer(source, target, target_schema="graph")
+        assert report["tables"]["nodes"]["rows"] == 2
+        assert await target.fetchval("SELECT COUNT(*) FROM graph.nodes") == 2
+        assert await target.fetchval("SELECT COUNT(*) FROM graph.idempotency_keys") == 0
+        assert (
+            await target.fetchval(
+                "SELECT email FROM graph.users WHERE user_id=$1", owner
+            )
+            == f"{owner}@atlas.invalid"
+        )
+        assert await source.fetchval("SELECT COUNT(*) FROM public.users") == 3
+        assert (
+            await source.fetchval("SELECT COUNT(*) FROM public.idempotency_keys") == 1
+        )
+        assert (
+            await source.fetchval(
+                "SELECT github_access_token FROM public.users WHERE user_id=$1", owner
+            )
+            == "disposable-oauth-token"
+        )
+    finally:
+        await target.close()
+
+
 async def test_failed_transfer_rolls_back_data_and_trigger_changes(databases):
     source, target, _ = databases
     owner, *_ = await seed(source)
@@ -351,7 +394,7 @@ async def test_failed_transfer_rolls_back_data_and_trigger_changes(databases):
 
 async def test_transfer_uses_one_source_snapshot_during_concurrent_writes(databases):
     source, target, observer = databases
-    *_, root, child = await seed(source)
+    root = (await seed(source))[3]
     parsed = urlsplit(os.environ["ATLAS_TEST_PG_DSN"])
     name = await source.fetchval("SELECT current_database()")
     writer = await asyncpg.connect(urlunsplit(parsed._replace(path=f"/{name}")))

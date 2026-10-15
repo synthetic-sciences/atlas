@@ -63,13 +63,26 @@ def fingerprint(rows: list[str]) -> str:
     return hashlib.sha256(b"".join(hashes)).hexdigest()
 
 
-async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> dict:
+async def transfer(
+    source: asyncpg.Connection,
+    target: asyncpg.Connection,
+    *,
+    source_schema: str = "public",
+    target_schema: str = "public",
+) -> dict:
     """Copy a consistent graph snapshot, preserving IDs and validating every row.
 
     The caller supplies a fresh graph schema. Existing target data is never
     replaced. Shared account idempotency records cannot be classified by their
     one-way scope hashes, so they require an authenticated legacy replay bridge.
     """
+    if any(
+        not re.fullmatch(r"[a-z_][a-z0-9_]*", name)
+        for name in (source_schema, target_schema)
+    ):
+        raise ValueError("Graph schemas must be PostgreSQL identifiers")
+    origin = f'"{source_schema}"'
+    destination = f'"{target_schema}"'
     identities = [
         await connection.fetchrow(
             "SELECT inet_server_addr(),inet_server_port(),current_database()"
@@ -78,18 +91,17 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
     ]
     if any(not row[2].startswith("atlas_graph_") for row in identities):
         raise ValueError("This rehearsal accepts isolated atlas_graph_* databases only")
-    if identities[0] == identities[1]:
-        raise ValueError("Source and target must be different databases")
+    if identities[0] == identities[1] and source_schema == target_schema:
+        raise ValueError("Source and target must use different databases or schemas")
     names = {
         row[0]
         for row in await target.fetch(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'"
+            "SELECT table_name FROM information_schema.tables WHERE table_schema=$1 AND table_type='BASE TABLE'",
+            target_schema,
         )
     }
     required = {*TABLES, "idempotency_keys", "atlas_schema_versions"}
-    if names != required or await target.fetchval(
-        "SELECT array_agg(version ORDER BY version) FROM atlas_schema_versions"
-    ) != [1]:
+    if names != required:
         raise ValueError("Target must contain only the initialized graph schema")
     report = {
         "tables": {},
@@ -109,24 +121,36 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
     ):
         await source.execute("SET LOCAL TIME ZONE 'UTC'")
         await target.execute("SET LOCAL TIME ZONE 'UTC'")
+        await source.execute(f"SET LOCAL search_path TO {origin}, public")
+        await target.execute(f"SET LOCAL search_path TO {destination}, public")
         await target.execute("SET LOCAL lock_timeout = '5s'")
         await target.execute(
             "LOCK TABLE "
-            + ",".join(f'public."{table}"' for table in (*TABLES, "idempotency_keys"))
+            + ",".join(
+                f'{destination}."{table}"'
+                for table in (*TABLES, "idempotency_keys", "atlas_schema_versions")
+            )
             + " IN ACCESS EXCLUSIVE MODE"
         )
+        if await target.fetchval(
+            f"SELECT array_agg(version ORDER BY version) FROM {destination}.atlas_schema_versions"
+        ) != [1]:
+            raise ValueError("Target must contain only the initialized graph schema")
         for table in (*TABLES, "idempotency_keys"):
-            if await target.fetchval(f'SELECT EXISTS (SELECT 1 FROM public."{table}")'):
+            if await target.fetchval(
+                f'SELECT EXISTS (SELECT 1 FROM {destination}."{table}")'
+            ):
                 raise ValueError("Target graph tables must be empty")
         # Project dedupe triggers populate a companion table during inserts.
         # Restore both tables from the same snapshot with those user triggers
         # suspended; foreign-key and uniqueness constraints remain enforced.
-        await target.execute("ALTER TABLE public.nodes DISABLE TRIGGER USER")
+        await target.execute(f"ALTER TABLE {destination}.nodes DISABLE TRIGGER USER")
         for table in TABLES:
             columns = [
                 row[0]
                 for row in await target.fetch(
-                    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position",
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 ORDER BY ordinal_position",
+                    target_schema,
                     table,
                 )
             ]
@@ -135,7 +159,8 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
             source_columns = {
                 row[0]
                 for row in await source.fetch(
-                    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1",
+                    "SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2",
+                    source_schema,
                     table,
                 )
             }
@@ -156,23 +181,23 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
                     for column in columns
                 )
                 where = " WHERE " + " OR ".join(
-                    f'EXISTS (SELECT 1 FROM public."{name}" r WHERE r."{column}"::text=t.user_id::text)'
+                    f'EXISTS (SELECT 1 FROM {origin}."{name}" r WHERE r."{column}"::text=t.user_id::text)'
                     for name, column in REFERENCES
                 )
             records = await source.fetch(
-                f'SELECT jsonb_build_object({pairs}) FROM public."{table}" t{where}'
+                f'SELECT jsonb_build_object({pairs}) FROM {origin}."{table}" t{where}'
             )
             rows = [row[0] for row in records]
             if rows:
                 quoted = ",".join(f'"{column}"' for column in columns)
                 await target.execute(
-                    f'INSERT INTO public."{table}" ({quoted}) SELECT {quoted} FROM jsonb_populate_recordset(NULL::public."{table}", $1::jsonb)',
+                    f'INSERT INTO {destination}."{table}" ({quoted}) SELECT {quoted} FROM jsonb_populate_recordset(NULL::{destination}."{table}", $1::jsonb)',
                     "[" + ",".join(rows) + "]",
                 )
             restored = [
                 row[0]
                 for row in await target.fetch(
-                    f'SELECT to_jsonb(t) FROM public."{table}" t'
+                    f'SELECT to_jsonb(t) FROM {destination}."{table}" t'
                 )
             ]
             expected = fingerprint(rows)
@@ -181,11 +206,13 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
             report["tables"][table] = {"rows": len(rows), "sha256": expected}
             for column in columns:
                 sequence = await target.fetchval(
-                    "SELECT pg_get_serial_sequence($1,$2)", f"public.{table}", column
+                    "SELECT pg_get_serial_sequence($1,$2)",
+                    f'{destination}."{table}"',
+                    column,
                 )
                 if sequence:
                     maximum = await target.fetchval(
-                        f'SELECT MAX("{column}") FROM public."{table}"'
+                        f'SELECT MAX("{column}") FROM {destination}."{table}"'
                     )
                     await target.execute(
                         "SELECT setval($1::regclass,$2,$3)",
@@ -193,7 +220,7 @@ async def transfer(source: asyncpg.Connection, target: asyncpg.Connection) -> di
                         maximum or 1,
                         maximum is not None,
                     )
-        await target.execute("ALTER TABLE public.nodes ENABLE TRIGGER USER")
+        await target.execute(f"ALTER TABLE {destination}.nodes ENABLE TRIGGER USER")
     return report
 
 
@@ -201,6 +228,8 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-env", default="ATLAS_TRANSFER_SOURCE")
     parser.add_argument("--target-env", default="ATLAS_TRANSFER_TARGET")
+    parser.add_argument("--source-schema", default="public")
+    parser.add_argument("--target-schema", default="public")
     args = parser.parse_args()
     source_dsn = os.environ[args.source_env]
     target_dsn = os.environ[args.target_env]
@@ -218,7 +247,17 @@ async def main() -> None:
     try:
         target = await asyncpg.connect(target_dsn)
         try:
-            print(json.dumps(await transfer(source, target), indent=2))
+            print(
+                json.dumps(
+                    await transfer(
+                        source,
+                        target,
+                        source_schema=args.source_schema,
+                        target_schema=args.target_schema,
+                    ),
+                    indent=2,
+                )
+            )
         finally:
             await target.close()
     finally:

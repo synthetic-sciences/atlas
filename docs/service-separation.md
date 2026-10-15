@@ -5,6 +5,24 @@ cutover. Dashboard currently hosts the pinned graph wheel. The standalone
 Atlas service already runs against graph-only SQLite or PostgreSQL; its hosted
 identity and provider integration still needs a two-service rehearsal.
 
+## Database permissions
+
+Atlas can use a separate database or a dedicated schema on the existing
+PostgreSQL server. `ATLAS_DATABASE_SCHEMA` selects the schema explicitly. An
+administrator creates the schema and its login; the runtime login owns only
+graph objects and has no privileges on Dashboard's tables, no role memberships,
+and no superuser, role-creation, database-creation, or RLS-bypass authority.
+The pgvector extension remains in `public` while graph types, tables, functions,
+and indexes live in the selected schema. Provision credentials through the
+deployment secret store.
+
+Startup rejects invalid or inaccessible schemas. Real PostgreSQL tests run
+project creation, reads, and deduplication as a restricted login alongside
+private `public.users` and `public.nodes` tables; direct reads of both private
+tables are denied. This provides a tested storage boundary without giving the
+graph runtime the account database's administrator credentials. It does not
+authorize a live cutover by itself.
+
 ## Data rehearsal
 
 `atlas_graph.ops.transfer` copies a consistent, read-only PostgreSQL snapshot
@@ -36,7 +54,9 @@ uv sync --project backend --extra dev --extra pg
 uv run --project backend python -m atlas_graph.ops.transfer
 ```
 
-`ATLAS_TRANSFER_SOURCE` and `ATLAS_TRANSFER_TARGET` select the databases. The
+`ATLAS_TRANSFER_SOURCE` and `ATLAS_TRANSFER_TARGET` select the databases.
+`--source-schema` and `--target-schema` select schemas (both default to `public`),
+including separate schemas in one disposable database. The
 report contains counts and checksums, no row contents, and explicitly marks the
 rehearsal as insufficient for production cutover. The real PostgreSQL tests
 seed every transferred table alongside private platform data, continue writing

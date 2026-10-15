@@ -41,6 +41,12 @@ adapter and signing secret and otherwise fails closed. Public discovery is
 disabled by default. Optional direct embeddings use `ATLAS_EMBEDDING_API_KEY`,
 `ATLAS_EMBEDDING_BASE_URL`, and `ATLAS_EMBEDDING_MODEL`.
 
+For PostgreSQL, `ATLAS_DATABASE_SCHEMA` selects a pre-created graph schema
+(default `public`). Use a login that owns only that schema and cannot read the
+Dashboard tables. A missing or invalid schema fails startup without falling
+back to another schema. See [service separation](docs/service-separation.md)
+for the data rehearsal and the remaining hosted cutover gates.
+
 ## Checks and releases
 
 ```sh
