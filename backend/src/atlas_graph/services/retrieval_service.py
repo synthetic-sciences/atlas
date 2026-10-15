@@ -25,6 +25,7 @@ query-embeddings for audit), but the shape leaves room for P1.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import json
 import logging
 import re
@@ -34,6 +35,7 @@ from typing import Any, Iterable
 
 from atlas_graph import config
 from atlas_graph.clients import openai_embed
+from atlas_graph.runtime import host
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +132,12 @@ def _node_chunks(node: dict[str, Any]) -> list[dict[str, Any]]:
     summary = (node.get("summary") or "").strip()
     if title or summary:
         combined = "\n\n".join(x for x in (title, summary) if x)
-        out.append({"text": combined, "metadata": {"field": "title_summary"}})
+        out.extend(
+            {"text": text, "metadata": {"field": "title_summary"}}
+            for text in _split_with_overlap(
+                combined, _MAX_CHARS_PER_CHUNK, _OVERLAP_CHARS
+            )
+        )
 
     content = node.get("content") or ""
     for para_chunk in _chunk_content(content):
@@ -138,7 +145,12 @@ def _node_chunks(node: dict[str, Any]) -> list[dict[str, Any]]:
 
     hypothesis = (node.get("hypothesis") or "").strip()
     if hypothesis:
-        out.append({"text": hypothesis, "metadata": {"field": "hypothesis"}})
+        out.extend(
+            {"text": text, "metadata": {"field": "hypothesis"}}
+            for text in _split_with_overlap(
+                hypothesis, _MAX_CHARS_PER_CHUNK, _OVERLAP_CHARS
+            )
+        )
 
     insights = node.get("insights")
     if isinstance(insights, str):
@@ -150,8 +162,11 @@ def _node_chunks(node: dict[str, Any]) -> list[dict[str, Any]]:
         for idx, insight in enumerate(insights):
             text = (insight or "").strip() if isinstance(insight, str) else ""
             if text:
-                out.append(
-                    {"text": text, "metadata": {"field": "insight", "index": idx}}
+                out.extend(
+                    {"text": part, "metadata": {"field": "insight", "index": idx}}
+                    for part in _split_with_overlap(
+                        text, _MAX_CHARS_PER_CHUNK, _OVERLAP_CHARS
+                    )
                 )
 
     return out
@@ -252,6 +267,31 @@ async def embed_text(
     return vec, None
 
 
+@asynccontextmanager
+async def _index_write(db):
+    raw = getattr(db, "raw", None)
+    if raw is not None:
+        async with raw.transaction():
+            yield
+        return
+    nested = db.in_transaction
+    await db.execute("SAVEPOINT atlas_index_write" if nested else "BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        if nested:
+            await db.execute("ROLLBACK TO atlas_index_write")
+            await db.execute("RELEASE atlas_index_write")
+        else:
+            await db.rollback()
+        raise
+    else:
+        if nested:
+            await db.execute("RELEASE atlas_index_write")
+        else:
+            await db.commit()
+
+
 async def embed_node(db, node_id: str) -> int:
     """Chunk a node's text fields, embed each chunk, and write knowledge_chunks rows.
 
@@ -261,7 +301,7 @@ async def embed_node(db, node_id: str) -> int:
     """
     node_row = await _fetchone(
         db,
-        "SELECT node_id, owner_user_id, title, summary, content, hypothesis, insights "
+        "SELECT node_id, owner_user_id, revision, title, summary, content, hypothesis, insights "
         "FROM nodes WHERE node_id = ?",
         (node_id,),
     )
@@ -277,71 +317,90 @@ async def embed_node(db, node_id: str) -> int:
 
     # Bill the node owner - they triggered the (re)index indirectly by
     # staging or committing this node.
-    vectors = await openai_embed.embed_batch(
-        [c["text"] for c in chunks],
-        db=db,
-        user_id=node["owner_user_id"],
-        endpoint="graph_index_embedding",
+    callback = host().index
+    vectors = (
+        await callback(node, chunks)
+        if callback is not None
+        else await openai_embed.embed_batch(
+            [c["text"] for c in chunks],
+            db=db,
+            user_id=node["owner_user_id"],
+            endpoint="graph_index_embedding",
+        )
     )
     if len(vectors) != len(chunks):  # pragma: no cover - defensive
         raise RuntimeError(
             f"embed_node: embedder returned {len(vectors)} vectors for {len(chunks)} chunks"
         )
 
-    # Create the graph source only after managed embedding has been accepted
-    # and settled.  In SQLite, writing it before ``place_hold`` borrowed an
-    # unrelated open transaction across the provider call and prevented the
-    # hold helper from committing its own preauthorization boundary.
-    source_id = await _node_source_id(db, node_id, node["owner_user_id"])
+    async with _index_write(db):
+        current = await _fetchone(
+            db,
+            "SELECT node_id,owner_user_id,revision,title,summary,content,hypothesis,insights FROM nodes WHERE node_id=?"
+            + (" FOR UPDATE" if getattr(db, "raw", None) is not None else ""),
+            (node_id,),
+        )
+        current = _row_to_dict(current)
+        if (
+            not current
+            or current["owner_user_id"] != node["owner_user_id"]
+            or current["revision"] != node["revision"]
+            or _node_chunks(current) != chunks
+        ):
+            return 0
+        # Create the graph source only after managed embedding has been accepted
+        # and settled.  In SQLite, writing it before ``place_hold`` borrowed an
+        # unrelated open transaction across the provider call and prevented the
+        # hold helper from committing its own preauthorization boundary.
+        source_id = await _node_source_id(db, node_id, node["owner_user_id"])
 
-    # Wipe any previous embedding for this node so re-embedding is idempotent.
-    await db.execute(
-        "DELETE FROM knowledge_chunks WHERE node_id = ?",
-        (node_id,),
-    )
+        # Wipe any previous embedding for this node so re-embedding is idempotent.
+        await db.execute(
+            "DELETE FROM knowledge_chunks WHERE node_id = ?",
+            (node_id,),
+        )
 
-    is_pg = _is_postgres()
-    for ordinal, (chunk, vec) in enumerate(zip(chunks, vectors)):
-        chunk_id = str(uuid.uuid4())
-        meta_json = json.dumps(chunk["metadata"])
-        if is_pg:
-            embedding_literal = _vector_literal(vec)
-            await db.execute(
-                """INSERT INTO knowledge_chunks
-                       (chunk_id, source_id, node_id, chunk_text,
-                        embedding, ordinal, metadata)
-                   VALUES (?, ?, ?, ?, ?::vector, ?, ?::jsonb)""",
-                (
-                    chunk_id,
-                    source_id,
-                    node_id,
-                    chunk["text"],
-                    embedding_literal,
-                    ordinal,
-                    meta_json,
-                ),
-            )
-        else:
-            # SQLite: store the vector as a JSON-encoded text blob.  We
-            # don't run vector math here (FTS-only fallback) but preserving
-            # the payload lets offline migration scripts re-ingest.
-            await db.execute(
-                """INSERT INTO knowledge_chunks
-                       (chunk_id, source_id, node_id, chunk_text,
-                        embedding, ordinal, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    chunk_id,
-                    source_id,
-                    node_id,
-                    chunk["text"],
-                    json.dumps(vec),
-                    ordinal,
-                    meta_json,
-                ),
-            )
+        is_pg = _is_postgres()
+        for ordinal, (chunk, vec) in enumerate(zip(chunks, vectors)):
+            chunk_id = str(uuid.uuid4())
+            meta_json = json.dumps(chunk["metadata"])
+            if is_pg:
+                embedding_literal = _vector_literal(vec)
+                await db.execute(
+                    """INSERT INTO knowledge_chunks
+                           (chunk_id, source_id, node_id, chunk_text,
+                            embedding, ordinal, metadata)
+                       VALUES (?, ?, ?, ?, ?::vector, ?, ?::jsonb)""",
+                    (
+                        chunk_id,
+                        source_id,
+                        node_id,
+                        chunk["text"],
+                        embedding_literal,
+                        ordinal,
+                        meta_json,
+                    ),
+                )
+            else:
+                # SQLite: store the vector as a JSON-encoded text blob.  We
+                # don't run vector math here (FTS-only fallback) but preserving
+                # the payload lets offline migration scripts re-ingest.
+                await db.execute(
+                    """INSERT INTO knowledge_chunks
+                           (chunk_id, source_id, node_id, chunk_text,
+                            embedding, ordinal, metadata)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        chunk_id,
+                        source_id,
+                        node_id,
+                        chunk["text"],
+                        json.dumps(vec),
+                        ordinal,
+                        meta_json,
+                    ),
+                )
 
-    await db.commit()
     logger.info("embed_node: wrote %d chunks for node %s", len(chunks), node_id)
     return len(chunks)
 
@@ -411,7 +470,7 @@ def _root_access_sql(node_id_sql: str) -> str:
                  SELECT 1 FROM node_edges parent_edge
                   WHERE parent_edge.child_id = r.node_id
            )
-             AND ({_publicsm_sql('r')}
+             AND ({_publicsm_sql("r")}
                   OR r.owner_user_id = ?
                   OR EXISTS (
                       SELECT 1 FROM node_access_rules root_access
@@ -432,14 +491,12 @@ async def _search_pg(
                (kc.embedding <=> ?::vector) AS distance
         FROM knowledge_chunks kc
         JOIN nodes n ON n.node_id = kc.node_id
-        WHERE ({_root_access_sql('kc.node_id')})
+        WHERE ({_root_access_sql("kc.node_id")})
           AND kc.embedding IS NOT NULL
         ORDER BY kc.embedding <=> ?::vector
         LIMIT ?
     """
-    rows = await _fetchall(
-        db, sql, (vec_literal, user_id, user_id, vec_literal, k)
-    )
+    rows = await _fetchall(db, sql, (vec_literal, user_id, user_id, vec_literal, k))
     return [_coerce_row(r) for r in rows]
 
 
@@ -463,7 +520,7 @@ async def _search_sqlite(
                kc.metadata, kc.ordinal
         FROM knowledge_chunks kc
         JOIN nodes n ON n.node_id = kc.node_id
-        WHERE ({_root_access_sql('kc.node_id')})
+        WHERE ({_root_access_sql("kc.node_id")})
           AND ({like_clauses})
         LIMIT ?
     """
@@ -558,8 +615,8 @@ async def search_graph(
         # an empty list rather than silently mis-ranking results.
         if not isinstance(query, str):
             logger.debug(
-                "search_graph: SQLite path requires a string query; "
-                "caller passed %s", type(query).__name__,
+                "search_graph: SQLite path requires a string query; caller passed %s",
+                type(query).__name__,
             )
             return []
         hits = await _search_sqlite(db, user_id, query, k)

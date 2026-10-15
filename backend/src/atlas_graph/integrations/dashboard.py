@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
+import json
+from typing import Annotated
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -50,6 +53,20 @@ class Commit(BaseModel):
 
 class Ref(BaseModel):
     object: Commit
+
+
+class Embeddings(BaseModel):
+    operation_id: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+    model: StrictStr
+    vectors: Annotated[
+        list[
+            Annotated[
+                list[Annotated[float, Field(strict=True, allow_inf_nan=False)]],
+                Field(min_length=1536, max_length=1536),
+            ]
+        ],
+        Field(min_length=1, max_length=16),
+    ]
 
 
 class Repository:
@@ -112,7 +129,12 @@ class Repository:
 
 class Dashboard:
     def __init__(
-        self, url: str, token: str, *, client: httpx.AsyncClient | None = None
+        self,
+        url: str,
+        token: str,
+        *,
+        client: httpx.AsyncClient | None = None,
+        index_token: str = "",
     ):
         parsed = urlsplit(url)
         if (
@@ -133,6 +155,7 @@ class Dashboard:
             raise ValueError("An Atlas account service credential is required")
         self.url = url.rstrip("/")
         self.token = token
+        self.index_token = index_token
         self.client = client or httpx.AsyncClient(
             timeout=10, follow_redirects=False, trust_env=False
         )
@@ -147,20 +170,26 @@ class Dashboard:
         headers: dict | None = None,
         method: str = "GET",
         body: dict | None = None,
+        account: bool = True,
+        timeout: float = 10,
     ) -> dict:
         try:
             response = await self.client.request(
                 method,
                 f"{self.url}/api/internal/atlas/{path}",
-                headers={**(headers or {}), "X-Atlas-Service-Token": self.token},
+                headers={
+                    **(headers or {}),
+                    **({"X-Atlas-Service-Token": self.token} if account else {}),
+                },
                 json=body,
                 follow_redirects=False,
+                timeout=timeout,
             )
         except httpx.HTTPError:
             raise HTTPException(503, detail="Account service unavailable") from None
         if response.status_code != 200:
             detail = None
-            if response.status_code in {400, 401, 403, 404, 409, 422, 429}:
+            if response.status_code in {400, 401, 402, 403, 404, 409, 410, 422, 429}:
                 try:
                     payload = response.json()
                     detail = (
@@ -191,6 +220,56 @@ class Dashboard:
         if organization:
             headers["X-Organization-ID"] = organization
         return Repository(self, headers)
+
+    async def index_node(self, node: dict, chunks: list[dict]) -> list[list[float]]:
+        if not chunks:
+            return []
+        if len(self.index_token) < 32:
+            from atlas_graph.clients._direct_embed import ConfigurationError
+
+            raise ConfigurationError("The hosted indexing adapter is not configured")
+        result = []
+        for offset in range(0, len(chunks), 16):
+            body = {
+                "owner_id": str(UUID(node["owner_user_id"])),
+                "node_id": str(UUID(node["node_id"])),
+                "revision": int(node["revision"]),
+                "texts": [chunk["text"] for chunk in chunks[offset : offset + 16]],
+            }
+            payload = await self.request(
+                "index/embeddings",
+                method="POST",
+                body=body,
+                headers={"X-Atlas-Index-Token": self.index_token},
+                account=False,
+                timeout=150,
+            )
+            try:
+                parsed = Embeddings.model_validate(payload)
+            except ValidationError:
+                raise HTTPException(
+                    503, detail="Invalid indexing service response"
+                ) from None
+            fingerprint = hashlib.sha256(
+                json.dumps(
+                    {
+                        "contract": "atlas-index-v1",
+                        "model": "openai/text-embedding-3-small",
+                        **body,
+                    },
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            if (
+                parsed.operation_id != fingerprint
+                or parsed.model != "openai/text-embedding-3-small"
+                or len(parsed.vectors) != len(body["texts"])
+            ):
+                raise HTTPException(503, detail="Invalid indexing service response")
+            result.extend(parsed.vectors)
+        return result
 
     async def authenticate(self, request: Request) -> dict:
         cached = getattr(request.state, "atlas_account_identity", None)

@@ -32,6 +32,51 @@ method, or request headers can be proxied. Redirects and ambiguous write retries
 are refused. Graph write access is required before pinning; an existing tag
 counts as pinned only when it points to the requested commit.
 
+## Managed indexing
+
+Hosted indexing sends bounded batches to Dashboard's
+`/api/internal/atlas/index/embeddings` operation. The independent
+`ATLAS_INDEX_SERVICE_TOKEN` grants this workload only; identity and repository
+requests continue to use `ATLAS_ACCOUNT_SERVICE_TOKEN`. Index requests never
+carry a user's bearer token or the account-adapter credential. Dashboard keeps
+provider keys and resolves the graph owner's Personal Wallet under its existing
+managed-usage policy. Atlas cannot choose a provider, model, or funding account.
+
+Each batch contains the owner ID, node ID, revision, and at most 16 texts of at
+most 2,048 characters each. A canonical operation fingerprint binds the reply to
+that exact batch. Atlas accepts only the fixed model and ordered, finite vectors
+of 1,536 numbers. Dashboard retains delivery results for seven days; an expired
+result returns 410 and cannot become another paid operation.
+
+Dashboard persists a fenced operation and reservation before provider dispatch,
+and a provider result and price snapshot before Wallet settlement. Retries reuse
+the result and settlement. An uncertain dispatched request remains pending until
+account-side reconciliation proves its reservation was terminally uncharged.
+This avoids blindly repeating a provider call or debiting a second Wallet.
+
+Atlas replaces a node's chunks atomically only after the managed operation
+succeeds and the node's owner, revision, and indexed text still match. A changed
+or deleted node cannot publish stale vectors, and a partial insert rolls back
+the entire replacement. Durable job scheduling, leader recovery, and backfill
+are still required before moving the live indexer; this RPC alone is not the
+background-worker cutover.
+
+## Fly layout
+
+The selected app names are `synsci-dashboard` and `synsci-graphs`, both in
+Singapore alongside the current deployment. They are separate apps because
+[Fly injects app secrets into every machine in that app](https://docs.fly.io/apps/secrets).
+API and indexing processes may share the graphs app once they use only graph
+credentials. Account and Wallet jobs remain in the dashboard app. Keep the
+existing PostgreSQL server, with separate credentials and schemas, rather than
+duplicating the account database into Atlas.
+
+The new app names are reserved without compute or storage. The existing
+`thesis-synsc.fly.dev` API continues serving production until gateway, storage,
+worker, replay, and writer-fencing checks pass. Its hostname must remain a
+compatibility entry point after cutover. Reserving a name does not migrate
+machines, credentials, volumes, or customer data.
+
 ## Database permissions
 
 Atlas can use a separate database or a dedicated schema on the existing

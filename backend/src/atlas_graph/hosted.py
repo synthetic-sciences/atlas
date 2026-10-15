@@ -15,6 +15,7 @@ def create_app():
     accounts = Dashboard(
         os.environ.get("ATLAS_ACCOUNT_URL", ""),
         os.environ.get("ATLAS_ACCOUNT_SERVICE_TOKEN", ""),
+        index_token=os.environ.get("ATLAS_INDEX_SERVICE_TOKEN", ""),
     )
     configure(
         Host(
@@ -23,6 +24,7 @@ def create_app():
             collaboration=accounts.collaboration_allowed,
             collaboration_label=accounts.collaboration_label,
             repository=accounts.repository,
+            index=accounts.index_node,
             shutdown=accounts.close,
         )
     )
