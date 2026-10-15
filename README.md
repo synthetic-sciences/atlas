@@ -1,103 +1,152 @@
-# Atlas
+<div align="center">
 
-Research graph engine, API, CLI, JavaScript SDK, and embeddable graph UI.
-The GitHub repository stays private. Its npm packages are public under Apache-2.0.
+<img src="assets/wordmark.svg" alt="Atlas" width="440">
 
-| Directory | Responsibility |
-| --- | --- |
-| `backend` | Graph storage, topology, revisions, evidence, permissions, research logs, indexing, HTTP API |
-| `cli` | `@synsci/atlas`, the graph CLI and compatible hosted client commands |
-| `sdk` | `@synsci/atlas-sdk`, dependency-free JavaScript/TypeScript client |
-| `ui` | `@synsci/atlas-ui`, compiled React components and declarations |
-| `landing` | Existing tryatlas.sh website and Vercel configuration |
+<br/>
 
-Accounts, organizations, Wallet, Stripe, managed inference/search, provider
-credentials, session telemetry, and platform administration belong to the
-separate private dashboard repository. Hosts supply identity, capabilities,
-storage, and providers through `atlas_graph.runtime.Host`. Graph implementation
-never imports dashboard code. The browser boundary is `configureAtlasUI`.
+**Research as a graph.**
 
-## Local development
+Connect ideas, experiments, evidence, and results.<br/>
+Keep the revisions and the reasoning that led you there.
+
+<br/>
+
+[![npm](https://img.shields.io/npm/v/%40synsci%2Fatlas?label=npm&color=1f1f1f)](https://www.npmjs.com/package/@synsci/atlas)
+[![license](https://img.shields.io/badge/license-Apache%202.0-1f1f1f.svg)](LICENSE)
+
+[Website](https://tryatlas.sh) · [CLI](cli/README.md) · [SDK](sdk/README.md) · [Graph UI](ui/README.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+<br/>
+
+## What it is
+
+Atlas is a research graph engine with a command line, an HTTP API, a JavaScript
+SDK, and a React graph UI. A project holds the question; connected nodes hold
+the work, evidence, and results. Revisions preserve how that work changed.
+
+```text
+                         research question
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                hypothesis               evidence
+                    │                       │
+               experiment ──────────────── source
+                    │
+                  result
+                    │
+              next question ...
+```
+
+- **Keep the context.** Link research nodes, attach evidence, record runs, and
+  follow the graph back to the work that produced a result.
+- **Make changes traceable.** Stage edits, commit revisions, pin repository
+  state, and retain an audit history.
+- **Work from your tools.** Use the CLI in a terminal or script, call the API
+  through the SDK, or embed the graph UI in your application.
+- **Run locally.** The standalone server uses SQLite by default and supports
+  PostgreSQL with pgvector. Graph rules do not require a Dashboard checkout.
+
+Atlas supplies the graph. [OpenScience](https://github.com/synthetic-sciences/OpenScience)
+is the research agent and workbench. Synthetic Sciences' hosted Dashboard owns
+accounts, organizations, Wallet, and managed providers.
+
+## Install
 
 ```sh
-npm ci
-uv sync --project backend --extra dev --extra pg
+npm install --global @synsci/atlas
+atlas --help
+```
+
+Or run the CLI without a global installation:
+
+```sh
+npx @synsci/atlas --help
+```
+
+Use `atlas login` for a hosted account, or connect it to a local graph server.
+The [CLI guide](cli/README.md) covers configuration. The CLI installs no agent
+skills, hooks, or agent configuration.
+
+## Your first local graph
+
+From a source checkout, start the server:
+
+```sh
+uv sync --project backend --frozen --extra pg
 uv run --project backend atlas-graph --port 8002
 ```
 
 In another terminal:
 
 ```sh
-ATLAS_BASE_URL=http://127.0.0.1:8002/api/v1 ATLAS_API_KEY=local node cli/bin/atlas.mjs project:create --title "My research"
-ATLAS_BASE_URL=http://127.0.0.1:8002/api/v1 ATLAS_API_KEY=local node cli/bin/atlas.mjs project:list
+export ATLAS_BASE_URL=http://127.0.0.1:8002/api/v1
+export ATLAS_API_KEY=local
+
+atlas project:create --title "My research"
+atlas project:list
 ```
 
-Local mode accepts loopback clients and origins. Set `ATLAS_DATA_DIR` for
-persistent storage and `ATLAS_LOCAL_TOKEN` to override the local token.
-`ATLAS_DATABASE_URL` selects PostgreSQL; SQLite is the default. The standalone
-schema contains graph data and author profiles, with no account credentials,
-organizations, Wallet, or telemetry. Hosted mode requires an explicit identity
-adapter and signing secret and otherwise fails closed. Public discovery is
-disabled by default. Optional direct embeddings use `ATLAS_EMBEDDING_API_KEY`,
-`ATLAS_EMBEDDING_BASE_URL`, and `ATLAS_EMBEDDING_MODEL`.
+Local mode accepts loopback connections. SQLite data lives in `data/` unless
+you set `ATLAS_DATA_DIR`; `ATLAS_LOCAL_TOKEN` replaces the local development
+token. Hosted deployments use an explicit identity adapter and signing secret.
+Public graph discovery is disabled by default.
 
-For PostgreSQL, `ATLAS_DATABASE_SCHEMA` selects a pre-created graph schema
-(default `public`). Use a login that owns only that schema and cannot read the
-Dashboard tables. A missing or invalid schema fails startup without falling
-back to another schema. See [service separation](docs/service-separation.md)
-for the data rehearsal and the remaining hosted cutover gates.
+## Build on Atlas
 
-The Dashboard identity adapter runs through
-`uv run --project backend uvicorn atlas_graph.hosted:create_app --factory`.
-It requires `ATLAS_MODE=hosted`, `ATLAS_ACCOUNT_URL`, an
-`ATLAS_ACCOUNT_SERVICE_TOKEN` matching Dashboard's `ATLAS_SERVICE_TOKEN`,
-and an Atlas-owned `ATLAS_SIGNING_SECRET`. Configure these through deployment
-secrets. Dashboard validates each request, including API-key revocation and
-workspace pinning. Atlas persists only graph profile fields and synthetic
-email addresses. Hosted provider, storage, and gateway cutover gates still
-apply before replacing the embedded production graph service.
+| Package | Use it for |
+| --- | --- |
+| [`@synsci/atlas`](https://www.npmjs.com/package/@synsci/atlas) | Graph commands, scripting, and hosted client workflows |
+| [`@synsci/atlas-sdk`](https://www.npmjs.com/package/@synsci/atlas-sdk) | JavaScript and TypeScript clients, with no runtime dependencies |
+| [`@synsci/atlas-ui`](https://www.npmjs.com/package/@synsci/atlas-ui) | React 19 graph views, nodes, evidence, revisions, and sharing |
 
-## Checks and releases
+```js
+import { AtlasClient } from "@synsci/atlas-sdk";
 
-```sh
-npm run typecheck
-npm run build:ui
-npm run test:cli
-npm run test:ui
-npm run test:sdk
-node --test scripts/registry.test.mjs
-uv run --project backend python -m pytest backend/tests --timeout=30
-uv build --project backend --wheel
-node scripts/pack-release.mjs
+const atlas = new AtlasClient({
+  baseUrl: "http://127.0.0.1:8002/api/v1",
+  token: "local",
+});
+
+const project = await atlas.createProject({ title: "My research" });
+const graph = await atlas.getNode(project.project_id);
 ```
 
-Npm releases promote an exact CI-green main commit. Each package is packed and
-checked before publication; partial releases resume only when existing package
-integrity matches. Packages install no agent skills, write no agent configuration,
-and have no postinstall hooks. The private repository cannot generate npm
-provenance, which requires public source; release manifests retain artifact hashes.
+The [SDK guide](sdk/README.md) covers requests and errors. The
+[UI guide](ui/README.md) covers styles, themes, and host adapters.
 
-Landing keeps its own frozen Bun lockfile and React 18 dependency tree. Run
-`bun install --frozen-lockfile` and `bun run build` there. The graph UI uses
-React 19 independently. `extraction.json` records source provenance.
+## Repository
 
-Releases authenticate to npm through the repository's `release-npm.yml`
-trusted publisher in the `npm` environment. No npm publishing token is stored
-in Actions. The release workflow checks the exact source commit and artifact
-integrity before publishing.
+```text
+backend/    Graph engine, HTTP API, storage, permissions, revisions, indexing
+cli/        Terminal client and command contracts
+sdk/        JavaScript client and TypeScript declarations
+ui/         React graph components, styles, and host integration
+landing/    tryatlas.sh
+docs/       Architecture, development, and release records
+```
 
-For a new package name, first stage the checked tarball with `npm stage publish`,
-configure its trusted publisher, and approve the initial staged release on npm.
-A staged version is reserved and cannot be overwritten by a direct publish.
-Resume the release with the same checked artifacts after approval; published
-versions are accepted only when their integrity matches the manifest. Registry
-processing may take several minutes, so verification waits up to five minutes
-per package. Keep package contents unchanged while a release is staged.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks,
+[architecture](docs/architecture.md) for the boundaries, and
+[server configuration](docs/development.md) for local and hosted settings.
+[AGENTS.md](AGENTS.md) records repository conventions. Pull requests are squash
+merged after their required checks pass.
 
-Private GitHub release records use `npm-<source commit>` and attach the checked
-manifest and tarballs. This lets the SDK or UI advance independently of the
-CLI version; existing version tags remain immutable.
+The npm packages are public. Source access is currently limited to repository
+collaborators; this repository remains private. Hosted service migration is
+tracked separately in [service separation](docs/service-separation.md).
 
-A saved trusted publisher that allows direct publication can publish a new
-version while older stages remain pending. Use a fresh version number;
-reserved staged versions cannot be overwritten. See [npm staged publishing](https://docs.npmjs.com/cli/v11/commands/npm-stage/).
+## Contributing and security
+
+Bug fixes, reproducible reports, API and CLI improvements, and clearer
+documentation are welcome. Start with the [contribution guide](CONTRIBUTING.md).
+Participation follows our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Report vulnerabilities privately using [SECURITY.md](SECURITY.md). Account,
+billing, and credential details belong in private support channels.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
