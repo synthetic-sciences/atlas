@@ -39,8 +39,9 @@ async def databases():
                 files("atlas_graph.db").joinpath("schema.pg.sql").read_text()
             )
             await connection.execute(
-                "CREATE TABLE atlas_schema_versions (version integer PRIMARY KEY); INSERT INTO atlas_schema_versions VALUES (1)"
+                "CREATE TABLE atlas_schema_versions (version integer PRIMARY KEY); INSERT INTO atlas_schema_versions VALUES (1),(2)"
             )
+            await connection.execute(files("atlas_graph.db").joinpath("index.pg.sql").read_text())
         yield connections
     finally:
         for connection in connections:
@@ -318,6 +319,27 @@ async def test_transfer_refuses_private_target_schema(databases):
         await transfer(source, target)
 
 
+async def test_transfer_rebuilds_pending_index_work_without_copying_leases(databases):
+    source, target, _ = databases
+    owner, _, _, root, child = await seed(source)
+    await source.execute(
+        "INSERT INTO audit_events (actor_user_id,node_id,operation,result_revision) VALUES ($1,$2,'atlas_commit_node',7)",
+        owner, root,
+    )
+    await source.execute(
+        "UPDATE atlas_index_jobs SET status='running',attempt=9,lease_token='disposable-stale-job',lease_until=9999999999 WHERE node_id=$1",
+        root,
+    )
+    await source.execute("INSERT INTO atlas_index_leader VALUES (1,'disposable-stale-leader',9999999999)")
+    report = await transfer(source, target)
+    assert report["scheduler"] == {"source": "commit audit", "queued_nodes": 1, "leases_copied": False}
+    restored = await target.fetchrow("SELECT status,attempt,lease_token,lease_until,revision FROM atlas_index_jobs WHERE node_id=$1", root)
+    assert tuple(restored) == ("pending", 0, "", 0, 7)
+    assert not await target.fetchval("SELECT EXISTS (SELECT 1 FROM atlas_index_jobs WHERE node_id=$1)", child)
+    assert await target.fetchval("SELECT COUNT(*) FROM atlas_index_leader") == 0
+    assert await source.fetchval("SELECT lease_token FROM atlas_index_jobs WHERE node_id=$1", root) == "disposable-stale-job"
+
+
 async def test_transfer_between_isolated_schemas_keeps_private_source_data(databases):
     source, _, _ = databases
     owner, *_ = await seed(source)
@@ -335,8 +357,9 @@ async def test_transfer_between_isolated_schemas_keeps_private_source_data(datab
         )
         await target.execute(schema)
         await target.execute(
-            "CREATE TABLE graph.atlas_schema_versions (version integer PRIMARY KEY); INSERT INTO graph.atlas_schema_versions VALUES (1)"
+            "CREATE TABLE graph.atlas_schema_versions (version integer PRIMARY KEY); INSERT INTO graph.atlas_schema_versions VALUES (1),(2)"
         )
+        await target.execute(files("atlas_graph.db").joinpath("index.pg.sql").read_text())
         report = await transfer(source, target, target_schema="graph")
         assert report["tables"]["nodes"]["rows"] == 2
         assert await target.fetchval("SELECT COUNT(*) FROM graph.nodes") == 2

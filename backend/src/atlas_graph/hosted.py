@@ -12,10 +12,16 @@ def create_app():
         raise RuntimeError("The hosted entry point requires ATLAS_MODE=hosted")
     if not os.environ.get("ATLAS_SIGNING_SECRET", "").strip():
         raise RuntimeError("Hosted Atlas requires its own signing secret")
+    index_token = os.environ.get("ATLAS_INDEX_SERVICE_TOKEN", "")
+    if config.INDEXING_ENABLED and (
+        len(index_token.strip()) < 32
+        or index_token == os.environ.get("ATLAS_ACCOUNT_SERVICE_TOKEN", "")
+    ):
+        raise RuntimeError("Hosted indexing requires a separate index service credential")
     accounts = Dashboard(
         os.environ.get("ATLAS_ACCOUNT_URL", ""),
         os.environ.get("ATLAS_ACCOUNT_SERVICE_TOKEN", ""),
-        index_token=os.environ.get("ATLAS_INDEX_SERVICE_TOKEN", ""),
+        index_token=index_token,
     )
     configure(
         Host(

@@ -57,9 +57,27 @@ This avoids blindly repeating a provider call or debiting a second Wallet.
 Atlas replaces a node's chunks atomically only after the managed operation
 succeeds and the node's owner, revision, and indexed text still match. A changed
 or deleted node cannot publish stale vectors, and a partial insert rolls back
-the entire replacement. Durable job scheduling, leader recovery, and backfill
-are still required before moving the live indexer; this RPC alone is not the
-background-worker cutover.
+the entire replacement.
+
+The standalone schema records commit jobs in the same transaction as the audit
+event. A versioned migration backfills historical commit audits, leaving drafts
+alone. The opt-in `ATLAS_INDEXING_ENABLED` worker claims jobs under a database
+leader lease and renews its job and leader leases while a provider is pending.
+Results require the current lease, fence, and commit generation. Chunk writes
+and job completion commit together; a newer commit remains pending instead of
+being acknowledged by an older result. Graceful cancellation and hard process
+termination leave recoverable work. Existing matching chunks with finite,
+1,536-dimensional vectors are reused without another embedding request.
+
+Temporary failures retain durable retries, funding and authorization failures
+remain blocked for a later retry, and expired paid results remain failed. Error
+codes contain no private provider diagnostics. Queue migration rebuilds pending
+work from commit audits and never copies worker leases.
+
+The embedded Dashboard worker remains in place until the service cutover. Its
+replacement must still pass the coupled account/provider recovery rehearsal,
+writer fencing, storage, gateway, and reverse migration gates. A passing
+standalone scheduler test does not authorize moving the live indexer.
 
 ## Fly layout
 

@@ -292,7 +292,7 @@ async def _index_write(db):
             await db.commit()
 
 
-async def embed_node(db, node_id: str) -> int:
+async def embed_node(db, node_id: str, *, guard=None, complete=None) -> int:
     """Chunk a node's text fields, embed each chunk, and write knowledge_chunks rows.
 
     Returns the number of chunks written.  Previously-embedded chunks for
@@ -348,6 +348,8 @@ async def embed_node(db, node_id: str) -> int:
             or _node_chunks(current) != chunks
         ):
             return 0
+        if guard is not None and not await guard(db):
+            return 0
         # Create the graph source only after managed embedding has been accepted
         # and settled.  In SQLite, writing it before ``place_hold`` borrowed an
         # unrelated open transaction across the provider call and prevented the
@@ -401,6 +403,8 @@ async def embed_node(db, node_id: str) -> int:
                     ),
                 )
 
+        if complete is not None:
+            await complete(db)
     logger.info("embed_node: wrote %d chunks for node %s", len(chunks), node_id)
     return len(chunks)
 

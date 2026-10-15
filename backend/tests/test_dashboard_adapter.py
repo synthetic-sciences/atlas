@@ -427,3 +427,18 @@ def test_hosted_entry_point_requires_explicit_mode_and_credentials(monkeypatch):
     monkeypatch.delenv("ATLAS_ACCOUNT_SERVICE_TOKEN", raising=False)
     with pytest.raises(ValueError, match="service credential"):
         create_app()
+
+
+def test_hosted_indexing_requires_its_separate_credential(monkeypatch):
+    from atlas_graph.hosted import create_app
+
+    monkeypatch.setenv("ATLAS_MODE", "hosted")
+    monkeypatch.setenv("ATLAS_SIGNING_SECRET", uuid4().hex)
+    monkeypatch.setenv("ATLAS_ACCOUNT_URL", "https://accounts.example.test")
+    token = uuid4().hex
+    monkeypatch.setenv("ATLAS_ACCOUNT_SERVICE_TOKEN", token)
+    monkeypatch.setenv("ATLAS_INDEXING_ENABLED", "true")
+    for value in ("", "short", token):
+        monkeypatch.setenv("ATLAS_INDEX_SERVICE_TOKEN", value)
+        with pytest.raises(RuntimeError, match="separate index service credential"):
+            create_app()

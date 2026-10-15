@@ -47,6 +47,18 @@ Hosted managed embeddings use a separate `ATLAS_INDEX_SERVICE_TOKEN`. Identity
 and repository operations continue to use the account service credential.
 These credentials have different scopes and must not be interchangeable.
 
+`ATLAS_INDEXING_ENABLED=true` starts the durable commit indexer with the graph
+API. It is off by default. Hosted startup refuses an absent, short, or reused
+index credential when indexing is enabled. Commit jobs persist even while the
+worker is disabled. Database leases allow multiple API processes to run the
+worker without simultaneously dispatching the same queue.
+
+Funding and authorization failures remain blocked with a later retry; temporary
+provider or service failures keep retrying with bounded backoff. An expired
+managed result is retained as failed rather than silently becoming a fresh paid
+operation. Inspect `atlas_index_jobs` through an authorized operator connection
+when diagnosing pending or failed work; job errors contain neutral codes.
+
 The graph host interface is `atlas_graph.runtime.Host`; the browser interface
 is `configureAtlasUI`. Keep both boundaries explicit. See
 [architecture](architecture.md) and [service separation](service-separation.md)
