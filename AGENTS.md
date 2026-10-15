@@ -20,7 +20,6 @@ Never put credentials or production data in source, fixtures, or build output.
 Run backend tests with the project interpreter (`uv run python -m pytest`),
 the CLI tests, UI tests, and TypeScript check before releasing changes.
 
-
 Run SDK tests and package checks too. Keep the CLI free of React dependencies.
 Landing uses its own Bun lock and React 18, independently of the React 19 UI.
 Release credentials belong in encrypted CI secrets, never source or artifacts.

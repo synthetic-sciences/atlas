@@ -31,8 +31,7 @@
   },
   "homepage": "https://tryatlas.sh",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "test:branding": "node --test tests/gateway-branding.test.mjs"
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "open": "^10.0.0"
