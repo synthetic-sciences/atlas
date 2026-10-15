@@ -94,6 +94,10 @@ versions are accepted only when their integrity matches the manifest. Registry
 processing may take several minutes, so verification waits up to five minutes
 per package. Keep package contents unchanged while a release is staged.
 
+Private GitHub release records use `npm-<source commit>` and attach the checked
+manifest and tarballs. This lets the SDK or UI advance independently of the
+CLI version; existing version tags remain immutable.
+
 A saved trusted publisher that allows direct publication can publish a new
 version while older stages remain pending. Use a fresh version number;
 reserved staged versions cannot be overwritten. See [npm staged publishing](https://docs.npmjs.com/cli/v11/commands/npm-stage/).
