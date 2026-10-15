@@ -12,7 +12,6 @@ class Host:
     database: Callable | None = None
     authenticate: Callable | None = None
     optional_auth: Callable | None = None
-    browser_auth: Callable | None = None
     dependency_database: Callable | None = None
     collaboration: Callable[..., Awaitable[bool]] | None = None
     collaboration_label: Callable[..., Awaitable[str]] | None = None
@@ -20,7 +19,6 @@ class Host:
     embeddings: Callable[[], object] | None = None
     billing_errors: Callable[[], tuple[type[Exception], ...]] | None = None
     errors: Callable | None = None
-    mfa: Callable | None = None
 
 
 _host = Host()

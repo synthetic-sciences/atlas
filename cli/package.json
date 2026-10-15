@@ -1,8 +1,7 @@
 {
   "name": "@synsci/atlas",
   "version": "0.15.0",
-  "private": true,
-  "description": "Retired OpenScience Gateway compatibility CLI.",
+  "description": "Atlas research graph CLI",
   "type": "module",
   "bin": {
     "atlas": "bin/atlas.mjs"
@@ -24,21 +23,25 @@
     "ai-agents"
   ],
   "author": "Synthetic Sciences",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/synthetic-sciences/thesis.git"
+    "url": "git+https://github.com/synthetic-sciences/atlas.git",
+    "directory": "cli"
   },
-  "homepage": "https://app.syntheticsciences.ai",
+  "homepage": "https://tryatlas.sh",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "test:branding": "node --test tests/gateway-branding.test.mjs",
-    "prepublishOnly": "node -e \"console.error('This retired package must not be published.'); process.exit(1)\""
+    "test:branding": "node --test tests/gateway-branding.test.mjs"
   },
   "dependencies": {
     "open": "^10.0.0"
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": false
   }
 }

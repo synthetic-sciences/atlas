@@ -57,7 +57,7 @@ async function fetchJson(baseUrl, route, { method = "GET", body, apiKey, timeout
   return payload;
 }
 
-// Gateway "Soft Porcelain" — same palette + Computer Modern serif body the
+// Atlas "Soft Porcelain" — same palette + Computer Modern serif body the
 // dashboard uses, just inlined so the callback page works without any
 // external assets. Auto-respects ``prefers-color-scheme`` so users in
 // dark mode don't get a flashbang. The CLI still resolves the login
@@ -66,7 +66,7 @@ const LOGIN_COMPLETE_HTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Gateway — signed in</title>
+<title>Atlas — signed in</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {
@@ -155,9 +155,9 @@ p.lede {
 </head>
 <body>
   <main class="card">
-    <span class="brand">OpenScience · Gateway</span>
+    <span class="brand">Atlas</span>
     <span class="dot" aria-hidden="true"></span>
-    <h1>Signed in to the Gateway CLI</h1>
+    <h1>Signed in to the Atlas CLI</h1>
     <p class="lede">You can close this tab and return to your terminal.<br>The CLI already picked up your key.</p>
     <p class="hint">atlas whoami</p>
   </main>
@@ -179,7 +179,7 @@ function startCallbackServer(expectedState) {
         const exchangeToken = url.searchParams.get("exchange_token") || "";
         if (state !== expectedState || !exchangeToken) {
           res.writeHead(400, { "Content-Type": "text/plain" });
-          res.end("Gateway login failed: callback state mismatch.");
+          res.end("Atlas login failed: callback state mismatch.");
           reject(new Error("browser login callback state mismatch"));
           return;
         }
@@ -243,7 +243,7 @@ async function runLogin(args, config, runtime) {
     //      successful result on stdout.
     const approvalUrl = started.approval_url;
     process.stderr.write(
-      `\nOpening browser to authorize the Gateway CLI…\n` +
+      `\nOpening browser to authorize the Atlas CLI…\n` +
         `If your browser doesn't open, paste this URL into one that's signed in:\n\n` +
         `  ${approvalUrl}\n\n` +
         `Waiting for approval (Ctrl-C to cancel)…\n`,
@@ -265,7 +265,7 @@ async function runLogin(args, config, runtime) {
     const timeoutMs = Number(runtime.wait_timeout || process.env.ATLAS_LOGIN_TIMEOUT_MS || 300_000);
     const callbackResult = await Promise.race([
       callback.done,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Gateway browser login timed out")), timeoutMs)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Atlas browser login timed out")), timeoutMs)),
     ]);
     const redeemed = await fetchJson(config.baseUrl, "/auth/cli/browser/redeem", {
       method: "POST",
@@ -855,7 +855,7 @@ export async function detectRunCommand(cwd) {
   return null;
 }
 
-// `atlas init` writes atlas.json, which turns on ambient Gateway behavior for
+// `atlas init` writes atlas.json, which turns on ambient Atlas behavior for
 // every agent session at or below this directory (the CLI walks *up* the tree
 // to find the nearest atlas.json). Running it in $HOME or a filesystem root
 // would therefore scope ambient mode to *everything* under it and bind it to a
@@ -871,7 +871,7 @@ function assertInitableDir(cwd, force) {
     const where = resolved === home ? "your home directory" : "a filesystem root";
     throw new Error(
       `Refusing to run \`atlas init\` in ${where} (${resolved}). atlas.json activates ambient ` +
-        `Gateway behavior for every session at or below this directory, so this would scope it to ` +
+        `Atlas behavior for every session at or below this directory, so this would scope it to ` +
         `everything under ${resolved} and bind it to a generic "Project: ${path.basename(resolved) || resolved}". ` +
         `cd into your research repo and re-run, or pass --path <dir>. Use --force only if you truly mean to.`,
     );
@@ -1789,7 +1789,7 @@ async function runAutoresearch(args, config) {
     verify: `${seeds} seeds, alpha ${alpha}`,
   };
   arLog("");
-  arLog("Gateway autoresearch — campaign plan");
+  arLog("Atlas autoresearch — campaign plan");
   arLog(`  repo:       ${plan.repo}  (HEAD ${plan.head}${plan.dirty ? ", DIRTY" : ""})`);
   arLog(`  goal:       "${goal}"   → metric: ${plan.metric}`);
   arLog(`  target:     ${target}`);

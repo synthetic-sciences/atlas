@@ -1,0 +1,88 @@
+name: Release npm packages
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Exact CI-green main commit
+        type: string
+        required: true
+      publish:
+        description: Publish the checked CLI, SDK, and UI packages publicly
+        type: boolean
+        default: false
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: atlas-npm-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+    steps:
+      - name: Validate release input
+        run: |
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify source and successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f branch=main -f event=push -f head_sha="$RELEASE_SHA" -f status=success \
+            --jq '.workflow_runs' > /tmp/atlas-ci.json
+          jq -e --arg sha "$RELEASE_SHA" 'any(.[]; .head_sha == $sha and .head_branch == "main" and .event == "push" and .status == "completed" and .conclusion == "success")' /tmp/atlas-ci.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11.6.0
+      - run: npm ci --ignore-scripts
+      - run: npm run build:ui
+      - run: node scripts/pack-release.mjs
+      - name: Dry-run publication
+        run: |
+          for package in dist/releases/*.tgz; do
+            npm publish "$package" --access public --dry-run --provenance=false
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: atlas-npm-release
+          path: dist/releases/
+          retention-days: 30
+      - name: Publish verified artifacts
+        if: inputs.publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          ATLAS_PUBLISH: 'true'
+        run: node scripts/publish-release.mjs
+      - name: Record private source release
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "JSON.parse(require('fs').readFileSync('cli/package.json')).version")
+          tag="v$version"
+          if gh release view "$tag" --json targetCommitish --jq .targetCommitish > /tmp/atlas-release-target; then
+            test "$(cat /tmp/atlas-release-target)" = "$RELEASE_SHA"
+          else
+            gh release create "$tag" --target "$RELEASE_SHA" --title "Atlas $version" \
+              --notes "Public npm CLI, SDK, and UI packages. Source repository remains private." \
+              dist/releases/*.tgz dist/releases/manifest.json
+          fi

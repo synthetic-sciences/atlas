@@ -1,60 +1,65 @@
 # Atlas
 
-Private research graph engine, HTTP API, CLI, client contract, and graph UI for
-Synthetic Sciences. This repository is extracted from dashboard commit
-`566904ae1e6157a4157a7469212f800bd026995f`; `extraction.json` records ownership.
-Public discovery and retired features retain their existing visibility.
+Research graph engine, API, CLI, JavaScript SDK, and embeddable graph UI.
+The GitHub repository stays private. Its npm packages are public under Apache-2.0.
 
-Accounts, organizations, Wallet, Stripe, managed inference/search, credentials,
-session telemetry, and administration live in `synthetic-sciences/dashboard`.
-An embedding host supplies those services through `atlas_graph.runtime.Host`.
-The graph implementation has no imports from dashboard source.
+| Directory | Responsibility |
+| --- | --- |
+| `backend` | Graph storage, topology, revisions, evidence, permissions, research logs, indexing, HTTP API |
+| `cli` | `@synsci/atlas`, the graph CLI and compatible hosted client commands |
+| `sdk` | `@synsci/atlas-sdk`, dependency-free JavaScript/TypeScript client |
+| `ui` | `@synsci/atlas-ui`, compiled React components and declarations |
+| `landing` | Existing tryatlas.sh website and Vercel configuration |
 
-## Local graph API and CLI
+Accounts, organizations, Wallet, Stripe, managed inference/search, provider
+credentials, session telemetry, and platform administration belong to the
+separate private dashboard repository. Hosts supply identity, capabilities,
+storage, and providers through `atlas_graph.runtime.Host`. Graph implementation
+never imports dashboard code. The browser boundary is `configureAtlasUI`.
 
-```sh
-cd backend
-uv sync --extra dev --extra pg
-uv run atlas-graph --port 8002
-```
-
-In another terminal at the repository root:
+## Local development
 
 ```sh
 npm ci
+uv sync --project backend --extra dev --extra pg
+uv run --project backend atlas-graph --port 8002
+```
+
+In another terminal:
+
+```sh
 ATLAS_BASE_URL=http://127.0.0.1:8002/api/v1 ATLAS_API_KEY=local node cli/bin/atlas.mjs project:create --title "My research"
 ATLAS_BASE_URL=http://127.0.0.1:8002/api/v1 ATLAS_API_KEY=local node cli/bin/atlas.mjs project:list
 ```
 
-Local mode accepts loopback clients and loopback browser origins only. Set
-`ATLAS_DATA_DIR` to select a storage directory. An optional `ATLAS_LOCAL_TOKEN`
-overrides the local development token. `ATLAS_DATABASE_URL` selects PostgreSQL;
-SQLite is the default. Both initialize only the graph schema and an author
-profile cache; neither creates account, billing, credential, or telemetry tables.
+Local mode accepts loopback clients and origins. Set `ATLAS_DATA_DIR` for
+persistent storage and `ATLAS_LOCAL_TOKEN` to override the local token.
+`ATLAS_DATABASE_URL` selects PostgreSQL; SQLite is the default. The standalone
+schema contains graph data and author profiles, with no account credentials,
+organizations, Wallet, or telemetry. Hosted mode requires an explicit identity
+adapter and signing secret and otherwise fails closed. Public discovery is
+disabled by default. Optional direct embeddings use `ATLAS_EMBEDDING_API_KEY`,
+`ATLAS_EMBEDDING_BASE_URL`, and `ATLAS_EMBEDDING_MODEL`.
 
-The optional direct embedding adapter uses `ATLAS_EMBEDDING_API_KEY`,
-`ATLAS_EMBEDDING_BASE_URL`, and `ATLAS_EMBEDDING_MODEL`. Provider keys never come
-from graph data. Managed embeddings are supplied by the dashboard adapter.
-
-## Graph UI
-
-The package exports `@synsci/atlas/ui` and `@synsci/atlas/ui/*`. The existing
-components and their rendered UI are preserved. `configureAtlasUI` supplies
-the host's authenticated request helpers, account shell, toast, and confirmation
-behavior. Graph permissions remain authoritative on the server.
-
-## Checks
+## Checks and releases
 
 ```sh
-uv run --project backend python -m pytest backend/tests --timeout=30
 npm run typecheck
-npm run test:ui
+npm run build:ui
 npm run test:cli
+npm run test:ui
+npm run test:sdk
+uv run --project backend python -m pytest backend/tests --timeout=30
 uv build --project backend --wheel
-npm pack --dry-run --json --ignore-scripts
+node scripts/pack-release.mjs
 ```
 
-The npm package remains private, has no installer hooks, and is not a public
-product launch. Historical package deprecation is owned by dashboard operations.
-CLI command, configuration, and wire identifiers are retained for compatibility.
+Npm releases promote an exact CI-green main commit. Each package is packed and
+checked before publication; partial releases resume only when existing package
+integrity matches. Packages install no agent skills, write no agent configuration,
+and have no postinstall hooks. The private repository cannot generate npm
+provenance, which requires public source; release manifests retain artifact hashes.
 
+Landing keeps its own frozen Bun lockfile and React 18 dependency tree. Run
+`bun install --frozen-lockfile` and `bun run build` there. The graph UI uses
+React 19 independently. `extraction.json` records source provenance.

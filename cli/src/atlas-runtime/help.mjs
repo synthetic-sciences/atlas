@@ -37,7 +37,7 @@ export function commandHelpJson(name) {
 
 export function renderRootHelp() {
   const lines = [
-    "Gateway CLI",
+    "Atlas CLI",
     "",
     "Usage:",
     "  atlas <command> [flags]",
@@ -55,7 +55,7 @@ export function renderRootHelp() {
   lines.push("");
   lines.push("Global options:");
   lines.push("  --format <format>          json | tsv | csv | table | pretty");
-  lines.push("  --env <profile>            Use a Gateway CLI profile");
+  lines.push("  --env <profile>            Use a Atlas CLI profile");
   lines.push("  --out <path>               Write output to a file, or - for stdout");
   lines.push("  --open                     Open browser-bound URLs when supported");
   lines.push("  --no-retry                 Disable transient-error retries");

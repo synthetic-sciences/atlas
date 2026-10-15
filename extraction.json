@@ -68,8 +68,6 @@
     "_split_ids",
     "_split_strings",
     "_coerce_sharing_mode",
-    "_is_platform_admin",
-    "_require_platform_admin",
     "_request_hash",
     "_log_cli_audit",
     "_node_from_result",
@@ -93,7 +91,6 @@
     "_safe_pdf_text",
     "_markdown_to_pdf",
     "_pdf_response",
-    "_repo_public_view",
     "_public_request_base",
     "_rewrite_upload_urls",
     "campaign_snapshot",
@@ -142,12 +139,6 @@
     "finalize_uploads",
     "handle_ticket_upload",
     "list_files",
-    "_parse_admin_cursor",
-    "_admin_graph_roots",
-    "admin_audit_purge",
-    "admin_graphs_list",
-    "admin_graphs_export_stream",
-    "admin_graphs_export",
     "get_blob",
     "export_history_jsonl",
     "export_subgraph",
@@ -160,7 +151,7 @@
     "research_log_list",
     "research_log_search"
   ],
-  "visibility": "private; existing hidden features remain hidden",
+  "visibility": "private GitHub source; public npm packages; existing hosted feature flags preserved",
   "backend_contract_tests": [
     "test_artifacts.py",
     "test_campaign_repo_ids.py",
@@ -172,5 +163,10 @@
     "test_node_tree_depth_limit.py",
     "test_project_dedupe_atomicity.py",
     "test_tags.py"
-  ]
+  ],
+  "landing": {
+    "source_repository": "synthetic-sciences/atlas-landing",
+    "source_repository_id": "R_kgDOSjSrkw",
+    "source_sha": "9e89cf115249c3a91e5c9a3de184592416aa2dc0"
+  }
 }

@@ -20,8 +20,7 @@ from fastapi.responses import RedirectResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from atlas_graph import config
 from atlas_graph.auth.access_check import check_node_access, require_node_access
-from atlas_graph.auth.admin_security import require_fresh_mfa
-from atlas_graph.dependencies import get_current_user, get_db, get_verified_browser_user, optional_auth
+from atlas_graph.dependencies import get_current_user, get_db, optional_auth
 from atlas_graph.models.artifact import DeleteArtifactRequest, FinalizeUploadRequest, PrepareUploadRequest, SetArtifactNoteRequest
 from atlas_graph.models.node import AddParentRequest, BranchNodeRequest, CommitNodeRequest, MergeNodesRequest, RemoveParentRequest, StageNodeCreateRequest, StageNodeUpdateRequest
 from atlas_graph.models.sharing import SetSharingBatchRequest, SetSharingRequest
@@ -174,21 +173,8 @@ def _coerce_sharing_mode(value: Any) -> str | None:
     return raw
 
 
-def _is_platform_admin(user: dict) -> bool:
-    allowed = {
-        item.strip()
-        for item in os.environ.get("THESIS_ADMIN_USER_IDS", "").split(",")
-        if item.strip()
-    }
-    return bool(allowed and user.get("user_id") in allowed)
 
 
-def _require_platform_admin(user: dict) -> None:
-    if not _is_platform_admin(user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Platform admin privileges required.",
-        )
 
 
 def _request_hash(payload: Any) -> str:
@@ -707,22 +693,6 @@ def _pdf_response(pdf_bytes: bytes, filename: str = "atlas-summary.pdf") -> Resp
     )
 
 
-def _repo_public_view(repo: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": repo.get("id"),
-        "name": repo.get("name"),
-        "full_name": repo.get("full_name"),
-        "private": bool(repo.get("private")),
-        "fork": bool(repo.get("fork")),
-        "archived": bool(repo.get("archived")),
-        "default_branch": repo.get("default_branch"),
-        "html_url": repo.get("html_url"),
-        "clone_url": repo.get("clone_url"),
-        "ssh_url": repo.get("ssh_url"),
-        "permissions": repo.get("permissions") or {},
-        "updated_at": repo.get("updated_at"),
-        "pushed_at": repo.get("pushed_at"),
-    }
 
 
 def _public_request_base(request: Request) -> str:
@@ -2043,255 +2013,16 @@ async def list_files(
         raise _service_error_to_http(e)
 
 
-def _parse_admin_cursor(cursor: str | None) -> int:
-    if cursor in (None, ""):
-        return 0
-    try:
-        offset = int(str(cursor))
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Invalid cursor") from exc
-    if offset < 0:
-        raise ValueError("Invalid cursor")
-    return offset
 
 
-async def _admin_graph_roots(
-    db: aiosqlite.Connection,
-    *,
-    tag_id: str | None,
-    kind: str | None,
-    owner_user_id: str | None,
-    created_after: str | None,
-    created_before: str | None,
-    cursor: str | None,
-    page_size: int,
-) -> dict[str, Any]:
-    clauses = ["NOT EXISTS (SELECT 1 FROM node_edges e WHERE e.child_id = n.node_id)"]
-    params: list[Any] = []
-    if tag_id:
-        clauses.append(
-            "EXISTS (SELECT 1 FROM tag_assignments ta WHERE ta.node_id = n.node_id AND ta.tag_id = ?)"
-        )
-        params.append(tag_id)
-    if kind:
-        clauses.append("n.node_type = ?")
-        params.append(kind)
-    if owner_user_id:
-        clauses.append("n.owner_user_id = ?")
-        params.append(owner_user_id)
-    if created_after:
-        clauses.append("n.created_at >= ?")
-        params.append(created_after)
-    if created_before:
-        clauses.append("n.created_at < ?")
-        params.append(created_before)
-    where = " AND ".join(clauses)
-    count_cursor = await db.execute(
-        f"SELECT COUNT(*) FROM nodes n WHERE {where}",
-        params,
-    )
-    total_count = (await count_cursor.fetchone())[0]
-    offset = _parse_admin_cursor(cursor)
-    rows_cursor = await db.execute(
-        f"""
-        SELECT n.node_id, n.slug_name, n.title, n.node_type AS kind,
-               n.lifecycle, n.owner_user_id, n.created_at, n.updated_at,
-               n.revision
-        FROM nodes n
-        WHERE {where}
-        ORDER BY n.created_at DESC
-        LIMIT ? OFFSET ?
-        """,
-        params + [page_size, offset],
-    )
-    columns = [desc[0] for desc in rows_cursor.description]
-    graphs = [dict(zip(columns, row)) for row in await rows_cursor.fetchall()]
-    end = offset + len(graphs)
-    return {
-        "graphs": graphs,
-        "items": graphs,
-        "count": len(graphs),
-        "total_count": total_count,
-        "page_info": {
-            "start_cursor": str(offset) if total_count else None,
-            "end_cursor": str(end) if end < total_count else None,
-            "has_next_page": end < total_count,
-            "has_previous_page": offset > 0,
-        },
-    }
 
 
-@router.post("/admin/audit/purge")
-async def admin_audit_purge(
-    days: int = Query(
-        90,
-        ge=7,
-        le=3650,
-        description=(
-            "Delete audit_events older than this many days. Minimum 7 to "
-            "prevent accidental wipes of yesterday's debugging trail."
-        ),
-    ),
-    dry_run: bool = Query(
-        False,
-        description="When true, count what would be deleted without deleting.",
-    ),
-    db: aiosqlite.Connection = Depends(get_db),
-    user: dict = Depends(get_verified_browser_user),
-):
-    """Admin-only retention purge for ``audit_events``.
-
-    The table grows unbounded on a write-heavy graph. There's no app-level
-    scheduler so this route is the manual lever — call it on a cron from
-    outside the cluster, or one-shot when investigating storage.
-    """
-    try:
-        _require_platform_admin(user)
-        require_fresh_mfa(user)
-        # Cutoff is computed in Python and passed as a parameter so the SQL
-        # is identical between SQLite and Postgres dialects.
-        from datetime import datetime, timedelta, timezone
-
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        cursor = await db.execute(
-            "SELECT COUNT(*) AS n FROM audit_events WHERE timestamp < ?",
-            (cutoff,),
-        )
-        try:
-            row = await cursor.fetchone()
-        finally:
-            await cursor.close()
-        candidate_count = int(row[0] if row is not None else 0)
-
-        if dry_run:
-            return {
-                "dry_run": True,
-                "cutoff": cutoff,
-                "would_delete": candidate_count,
-            }
-
-        await db.execute(
-            "DELETE FROM audit_events WHERE timestamp < ?",
-            (cutoff,),
-        )
-        await db.commit()
-        return {
-            "dry_run": False,
-            "cutoff": cutoff,
-            "deleted": candidate_count,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise _service_error_to_http(e)
 
 
-@router.get("/admin/graphs")
-async def admin_graphs_list(
-    tag_id: str | None = Query(None),
-    kind: str | None = Query(None),
-    owner_user_id: str | None = Query(None),
-    created_after: str | None = Query(None),
-    created_before: str | None = Query(None),
-    cursor: str | None = Query(None),
-    page_size: int = Query(50, ge=1, le=200),
-    db: aiosqlite.Connection = Depends(get_db),
-    user: dict = Depends(get_verified_browser_user),
-):
-    try:
-        _require_platform_admin(user)
-        require_fresh_mfa(user)
-        return await _admin_graph_roots(
-            db,
-            tag_id=tag_id,
-            kind=kind,
-            owner_user_id=owner_user_id,
-            created_after=created_after,
-            created_before=created_before,
-            cursor=cursor,
-            page_size=page_size,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise _service_error_to_http(e)
 
 
-@router.get("/admin/graphs/export-stream")
-async def admin_graphs_export_stream(
-    tag_id: str | None = Query(None),
-    kind: str | None = Query(None),
-    owner_user_id: str | None = Query(None),
-    created_after: str | None = Query(None),
-    created_before: str | None = Query(None),
-    cursor: str | None = Query(None),
-    page_size: int = Query(50, ge=1, le=200),
-    max_nodes: int | None = Query(None, ge=1),
-    db: aiosqlite.Connection = Depends(get_db),
-    user: dict = Depends(get_verified_browser_user),
-):
-    try:
-        _require_platform_admin(user)
-        require_fresh_mfa(user)
-        listed = await _admin_graph_roots(
-            db,
-            tag_id=tag_id,
-            kind=kind,
-            owner_user_id=owner_user_id,
-            created_after=created_after,
-            created_before=created_before,
-            cursor=cursor,
-            page_size=page_size,
-        )
-        lines: list[bytes] = []
-        for graph in listed["items"]:
-            export = await export_import_service.export_subgraph(
-                db,
-                user["user_id"],
-                [graph["node_id"]],
-                include_descendants=True,
-                max_nodes=max_nodes,
-                skip_access_check=True,
-            )
-            lines.append(
-                (
-                    json.dumps(
-                        {"root_node_id": graph["node_id"], "export": export},
-                        separators=(",", ":"),
-                    )
-                    + "\n"
-                ).encode("utf-8")
-            )
-        return StreamingResponse(iter(lines), media_type="application/x-ndjson")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise _service_error_to_http(e)
 
 
-@router.get("/admin/graphs/{root_node_id}/export")
-async def admin_graphs_export(
-    root_node_id: str,
-    max_nodes: int | None = Query(None, ge=1),
-    db: aiosqlite.Connection = Depends(get_db),
-    user: dict = Depends(get_verified_browser_user),
-):
-    try:
-        _require_platform_admin(user)
-        require_fresh_mfa(user)
-        export = await export_import_service.export_subgraph(
-            db,
-            user["user_id"],
-            [root_node_id],
-            include_descendants=True,
-            max_nodes=max_nodes,
-            skip_access_check=True,
-        )
-        return {"root_node_id": root_node_id, "export": export}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise _service_error_to_http(e)
 
 
 @router.get("/blobs")

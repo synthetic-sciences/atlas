@@ -54,12 +54,6 @@ async def optional_auth(request: Request) -> dict | None:
     return await get_current_user(request)
 
 
-async def get_verified_browser_user(user: dict = Depends(get_current_user)) -> dict:
-    if user.get("key_id"):
-        raise HTTPException(status_code=403, detail={"code": "verified_session_required"})
-    return user
-
-
 async def get_db():
     async with database() as db:
         yield db
@@ -69,6 +63,5 @@ async def get_db():
 # overrides and request-scoped database fixtures continue to apply.
 get_current_user = host().authenticate or get_current_user
 optional_auth = host().optional_auth or optional_auth
-get_verified_browser_user = host().browser_auth or get_verified_browser_user
 get_db = host().dependency_database or get_db
 

@@ -1,6 +1,7 @@
 [project]
 name = "atlas-graph"
 version = "0.1.0"
+license = "Apache-2.0"
 description = "Independent Atlas research graph engine and HTTP contract"
 requires-python = ">=3.12"
 dependencies = [

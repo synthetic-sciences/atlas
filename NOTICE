@@ -1,6 +1,6 @@
-This private repository contains code extracted from Synthetic Sciences'
-dashboard repository at commit 566904ae1e6157a4157a7469212f800bd026995f.
-Copyright and authorship remain with their original owners.
+Atlas
+Copyright 2026 Synthetic Sciences
 
-The compatibility CLI retains its MIT license in cli/LICENSE. This notice does
-not extend that license to the extracted private backend or frontend code.
+Licensed under the Apache License, Version 2.0.
+Code was extracted from the Synthetic Sciences dashboard.
+Original authorship is preserved in the private source history.
