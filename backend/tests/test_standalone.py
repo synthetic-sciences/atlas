@@ -96,6 +96,22 @@ async def test_standalone_does_not_load_dashboard_modules(client):
     assert not any(name.startswith("app.") for name in sys.modules)
 
 
+async def test_author_handles_preserve_case_insensitive_oldest_match(client):
+    from atlas_graph.db.connection import get_db
+    from atlas_graph.db.repos.user_repo import get_user_by_github_username
+
+    first, second = str(uuid4()), str(uuid4())
+    async with get_db() as db:
+        for identifier, handle, date in [(second, "researcher", "2026-10-02"), (first, "Researcher", "2026-10-01")]:
+            await db.execute(
+                "INSERT INTO users (user_id,email,github_username,created_at,updated_at) VALUES (?,?,?,?,?)",
+                (identifier, f"{identifier}@example.test", handle, date, date),
+            )
+        await db.commit()
+        assert (await get_user_by_github_username(db, " RESEARCHER "))["user_id"] == first
+        assert await get_user_by_github_username(db, " ") is None
+
+
 async def test_evidence_upload_and_download_without_dashboard(client):
     project = (await client.post("/api/v1/projects", json={"title": "Evidence"})).json()["project_id"]
     node = (await client.get(f"/api/nodes/{project}")).json()

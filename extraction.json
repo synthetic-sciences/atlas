@@ -160,5 +160,17 @@
     "research_log_list",
     "research_log_search"
   ],
-  "visibility": "private; existing hidden features remain hidden"
+  "visibility": "private; existing hidden features remain hidden",
+  "backend_contract_tests": [
+    "test_artifacts.py",
+    "test_campaign_repo_ids.py",
+    "test_campaign_service.py",
+    "test_commit_validation.py",
+    "test_export_import.py",
+    "test_node_lifecycle.py",
+    "test_node_repo_root_id.py",
+    "test_node_tree_depth_limit.py",
+    "test_project_dedupe_atomicity.py",
+    "test_tags.py"
+  ]
 }
