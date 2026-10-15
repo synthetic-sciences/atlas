@@ -54,6 +54,7 @@ jobs:
       - run: npm run test:ui
       - run: npm run test:cli
       - run: npm run test:sdk
+      - run: node --test scripts/registry.test.mjs
       - run: node scripts/pack-release.mjs
 
   landing:

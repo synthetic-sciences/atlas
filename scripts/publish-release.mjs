@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { waitForPackage } from "./registry.mjs";
 
 assert.equal(process.env.ATLAS_PUBLISH, "true", "Publishing must be explicitly enabled by the release workflow");
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -23,6 +24,6 @@ for (const item of manifest.packages) {
   const error = JSON.parse(existing.stdout || "{}").error;
   assert.equal(error?.code, "E404", `Registry lookup failed for ${spec}: ${error?.code || existing.status}`);
   execFileSync("npm", ["publish", archive, "--access", "public", "--provenance=false"], { stdio: "inherit" });
-  const published = JSON.parse(execFileSync("npm", ["view", spec, "dist.integrity", "--json"], { encoding: "utf8" }));
-  assert.equal(published, item.integrity, `Published integrity differs for ${spec}`);
+  console.log(`Waiting for registry processing of ${spec}`);
+  await waitForPackage(item.name, item.version, item.integrity);
 }
