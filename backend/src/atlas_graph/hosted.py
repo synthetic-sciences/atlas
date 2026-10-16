@@ -39,6 +39,7 @@ def create_app():
             collaboration_label=accounts.collaboration_label,
             repository=accounts.repository,
             query=accounts.query,
+            people=accounts.people,
             upload_ticket=accounts.upload_ticket,
             index=accounts.index_node,
             shutdown=accounts.close,

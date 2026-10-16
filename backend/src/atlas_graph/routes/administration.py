@@ -1,6 +1,7 @@
 """Fixed graph operations; the host owns administrator identity and MFA policy."""
 
 from datetime import datetime
+import asyncio
 import json
 import os
 import secrets
@@ -9,7 +10,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from atlas_graph import config
 from atlas_graph.dependencies import get_db
@@ -53,10 +54,69 @@ router = APIRouter(
 )
 
 
+from atlas_graph.integrations.dashboard import Dashboard, Profile
+
+
+@router.post("/identity-profile")
+async def identity_profile(body: Profile, db=Depends(get_db)):
+    await Dashboard.cache_profile(db, body)
+    await db.commit()
+    return {"synced": True}
+
+
 class Access(BaseModel):
     actor: UUID
     node_id: UUID
     require: Literal["view", "write", "admin"] = "view"
+
+
+class Mount(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actor: UUID
+    project_id: UUID
+    path: str = Field(min_length=8, max_length=512, pattern=r"^skills/[A-Za-z0-9._/-]+$")
+    operation: Literal["put", "read", "remove"]
+    markdown: str = Field(default="", max_length=524288)
+    manifest: str = Field(default="", max_length=65536)
+
+
+def mount_files(body: Mount) -> dict:
+    from atlas_graph.fs.volume import _volume_root
+    from atlas_graph.storage import local
+
+    base = local.path(f"projects/{body.project_id}/{body.path}")
+    root = _volume_root()
+    if body.operation == "put":
+        markdown, manifest = body.markdown.encode(), body.manifest.encode()
+        if len(markdown) > 1_048_576 or len(manifest) > 65536:
+            raise ValueError("Mounted skill exceeds the file limit")
+        local.upload(f"{base}/SKILL.md", markdown, root=root)
+        local.upload(f"{base}/skill.json", manifest, root=root)
+    elif body.operation == "remove":
+        # Remove only host-managed files; preserve any user-authored siblings.
+        local.delete(f"{base}/SKILL.md", root=root)
+        local.delete(f"{base}/skill.json", root=root)
+    else:
+        try:
+            return {"body": local.download(f"{base}/SKILL.md", root=root, limit=524288).decode()}
+        except FileNotFoundError:
+            return {"body": ""}
+    return {"path": f"{body.path}/SKILL.md"}
+
+
+@router.post("/project-mount")
+async def mount(body: Mount, db=Depends(get_db)):
+    from atlas_graph.db.repos import node_repo
+
+    root = await node_repo.find_root_node_id(db, str(body.project_id))
+    if root != str(body.project_id):
+        raise HTTPException(404, "Project not found")
+    if await check_node_access(db, str(body.actor), root, "view" if body.operation == "read" else "write") is not True:
+        raise HTTPException(403, "Access denied")
+    try:
+        return await asyncio.to_thread(mount_files, body)
+    except (ValueError, UnicodeError):
+        raise HTTPException(422, "Invalid project mount") from None
 
 
 @router.post("/graph-access")

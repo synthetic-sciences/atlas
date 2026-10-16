@@ -74,6 +74,7 @@ async def _collaborator_update_expands_access(
     root_id: str,
     owner_user_id: str,
     collaborators: list[Any],
+    resolved: dict[str, str | None],
 ) -> bool:
     """Return whether a replacement collaborator list grants more access.
 
@@ -89,13 +90,9 @@ async def _collaborator_update_expands_access(
     current = {row[0]: str(row[1]) for row in await cursor.fetchall()}
 
     for collaborator in collaborators:
-        cursor = await db.execute(
-            "SELECT user_id FROM users WHERE email = ?", (collaborator.email,)
-        )
-        user_row = await cursor.fetchone()
-        if user_row is None:
+        collaborator_user_id = resolved[collaborator.email]
+        if collaborator_user_id is None:
             return True
-        collaborator_user_id = user_row[0]
         if collaborator_user_id == owner_user_id:
             continue
 
@@ -131,7 +128,7 @@ def _derive_visibility(sharing_mode: str, collaborator_count: int) -> str:
 
 
 async def _build_sharing_response(
-    db, node_row: dict, user_id: str, requested_node_id: str | None = None
+    db, node_row: dict, user_id: str, requested_node_id: str | None = None, *, people=None
 ) -> dict:
     """Build a SharingResponse-compatible dict from a node row."""
     node_id = node_row["node_id"]
@@ -156,6 +153,9 @@ async def _build_sharing_response(
     )
     collab_rows = await cursor.fetchall()
 
+    emails = await people.emails([owner_user_id, *[crow[0] for crow in collab_rows]]) if people else None
+    if emails is not None:
+        owner_email = emails[owner_user_id]
     collaborators = []
     for crow in collab_rows:
         c_user_id, access_level, email = crow
@@ -163,7 +163,7 @@ async def _build_sharing_response(
             AccessLevel(access_level), CollaboratorRole.viewer
         )
         collaborators.append({
-            "email": email,
+            "email": emails[c_user_id] if emails is not None else email,
             "role": role_enum.value,
         })
 
@@ -223,7 +223,7 @@ async def _build_sharing_response(
 # get_sharing
 # ---------------------------------------------------------------------------
 
-async def get_sharing(db, user_id: str, node_id: str) -> dict:
+async def get_sharing(db, user_id: str, node_id: str, *, people=None) -> dict:
     """Retrieve sharing information for the graph containing a node."""
     await require_node_access(db, user_id, node_id, "view")
 
@@ -231,10 +231,10 @@ async def get_sharing(db, user_id: str, node_id: str) -> dict:
     row = await node_repo.get_node(db, root_id)
     if row is None:
         raise ValueError(f"Node {node_id} not found")
-    return await _build_sharing_response(db, row, user_id, requested_node_id=node_id)
+    return await _build_sharing_response(db, row, user_id, requested_node_id=node_id, people=people)
 
 
-async def get_sharing_summaries(db, user_id: str, node_ids: list[str]) -> dict:
+async def get_sharing_summaries(db, user_id: str, node_ids: list[str], *, people=None) -> dict:
     """Batch-read compact sharing summaries for multiple nodes.
 
     The CLI command is read-only and should not fail the whole batch
@@ -254,7 +254,7 @@ async def get_sharing_summaries(db, user_id: str, node_ids: list[str]) -> dict:
                     "error": "not_found",
                 })
                 continue
-            sharing = await _build_sharing_response(db, row, user_id, requested_node_id=node_id)
+            sharing = await _build_sharing_response(db, row, user_id, requested_node_id=node_id, people=people)
             summaries.append({
                 "node_id": node_id,
                 "project_id": sharing["project_id"],
@@ -282,7 +282,7 @@ async def get_sharing_summaries(db, user_id: str, node_ids: list[str]) -> dict:
 # set_sharing
 # ---------------------------------------------------------------------------
 
-async def set_sharing(db, user_id: str, node_id: str, req) -> dict:
+async def set_sharing(db, user_id: str, node_id: str, req, *, people=None) -> dict:
     """
     Update sharing for the graph containing a node.
 
@@ -306,6 +306,19 @@ async def set_sharing(db, user_id: str, node_id: str, req) -> dict:
     if target_mode in ("public", "unlisted") and not config.PUBLIC_GRAPHS_ENABLED:
         raise PublicSharingDisabledError("Public graph sharing is currently unavailable")
     owner_user_id = row["owner_user_id"]
+    resolved = {}
+    if req.collaborators:
+        emails = [collaborator.email for collaborator in req.collaborators]
+        if people:
+            resolved = await people.resolve(db, emails)
+        else:
+            for email in emails:
+                cursor = await db.execute("SELECT user_id FROM users WHERE email = ?", (email,))
+                person = await cursor.fetchone()
+                resolved[email] = person[0] if person else None
+    if people:
+        cursor = await db.execute("SELECT user_id FROM node_access_rules WHERE node_id = ?", (root_id,))
+        await people.emails([owner_user_id, *[item[0] for item in await cursor.fetchall()]])
     expands_private_collab = bool(
         req.collaborators
         and target_mode != "public"
@@ -314,6 +327,7 @@ async def set_sharing(db, user_id: str, node_id: str, req) -> dict:
             root_id=root_id,
             owner_user_id=owner_user_id,
             collaborators=req.collaborators,
+            resolved=resolved,
         )
     )
     if expands_private_collab:
@@ -342,15 +356,9 @@ async def set_sharing(db, user_id: str, node_id: str, req) -> dict:
 
         # Add new collaborators
         for collab in req.collaborators:
-            # Resolve email to user_id
-            cursor = await db.execute(
-                "SELECT user_id FROM users WHERE email = ?", (collab.email,)
-            )
-            user_row = await cursor.fetchone()
-            if user_row is None:
+            collab_user_id = resolved[collab.email]
+            if collab_user_id is None:
                 continue  # skip unknown users
-
-            collab_user_id = user_row[0]
             if collab_user_id == row["owner_user_id"]:
                 continue  # skip owner
 
@@ -368,14 +376,14 @@ async def set_sharing(db, user_id: str, node_id: str, req) -> dict:
 
     # Re-fetch the node to build response
     updated_row = await node_repo.get_node(db, root_id)
-    return await _build_sharing_response(db, updated_row, user_id, requested_node_id=node_id)
+    return await _build_sharing_response(db, updated_row, user_id, requested_node_id=node_id, people=people)
 
 
 # ---------------------------------------------------------------------------
 # set_sharing_batch
 # ---------------------------------------------------------------------------
 
-async def set_sharing_batch(db, user_id: str, node_ids: list[str], req) -> list[dict]:
+async def set_sharing_batch(db, user_id: str, node_ids: list[str], req, *, people=None) -> list[dict]:
     """Apply sharing settings to distinct graph roots for the supplied nodes."""
     results = []
     seen_roots: set[str] = set()
@@ -384,6 +392,6 @@ async def set_sharing_batch(db, user_id: str, node_ids: list[str], req) -> list[
         if root_id in seen_roots:
             continue
         seen_roots.add(root_id)
-        result = await set_sharing(db, user_id, nid, req)
+        result = await set_sharing(db, user_id, nid, req, people=people)
         results.append(result)
     return results
