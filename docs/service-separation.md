@@ -1,10 +1,11 @@
 # Independent service and data cutover
 
-Repository extraction is deployed separately from the live service and data
-cutover. Dashboard currently hosts the pinned graph wheel. The standalone
-Atlas service already runs against graph-only SQLite or PostgreSQL; its hosted
-identity integration passes a two-service PostgreSQL rehearsal. Provider,
-gateway, storage, and writer-cutover contracts remain separate gates.
+The hosted service and data cutover completed on 2026-10-16. `synsci-graphs`
+serves graph operations and runs its durable indexer with a graph-only database
+credential and persistent volume. `synsci-dashboard` retains accounts, Wallet,
+providers and private administration. The existing public API hostname remains
+a streaming compatibility proxy. The graph UI and hidden/public flags are
+unchanged. The contracts and recovery gates below also apply to future moves.
 
 The hosted entry point is `atlas_graph.hosted:create_app`. Its Dashboard adapter
 calls `/api/internal/atlas/identity` with the incoming bearer and workspace
@@ -76,10 +77,11 @@ remain blocked for a later retry, and expired paid results remain failed. Error
 codes contain no private provider diagnostics. Queue migration rebuilds pending
 work from commit audits and never copies worker leases.
 
-The embedded Dashboard worker remains in place until the service cutover. Its
-replacement must still pass the coupled account/provider recovery rehearsal,
-writer fencing, storage, gateway, and reverse migration gates. A passing
-standalone scheduler test does not authorize moving the live indexer.
+The embedded Dashboard graph indexer is disabled in production. The independent
+Atlas indexer uses Dashboard's scoped managed-operation boundary. Any later
+indexer move must repeat the coupled account/provider recovery, writer-fencing,
+storage, gateway and reverse-migration checks; a scheduler test alone is
+insufficient.
 
 ## Managed graph search
 
@@ -118,20 +120,21 @@ credentials. Account and Wallet jobs remain in the dashboard app. Keep the
 existing PostgreSQL server, with separate credentials and schemas, rather than
 duplicating the account database into Atlas.
 
-The new app names are reserved without compute or storage. The existing
-`thesis-synsc.fly.dev` API continues serving production until gateway, storage,
-worker, replay, and writer-fencing checks pass. Its hostname must remain a
-compatibility entry point after cutover. Reserving a name does not migrate
-machines, credentials, volumes, or customer data.
+Both apps are deployed with separate persistent volumes. The existing
+`thesis-synsc.fly.dev` API now runs a non-root, credential-free compatibility
+proxy to Dashboard over Fly's private network. Dashboard forwards graph-owned
+routes to Atlas. The old backend machines are retired; original storage and
+snapshots remain available for recovery. Do not remove the compatibility
+hostname while clients, authentication callbacks or signed links depend on it.
 
 ## Graph-owned blobs
 
 The hosted graph service stores evidence under its own `ATLAS_DATA_DIR/blobs`
 on a persistent graph volume. It rejects `ATLAS_SUPABASE_SERVICE_ROLE_KEY`;
-Dashboard's storage administrator credential does not enter Atlas. The embedded
-compatibility package retains its existing optional Supabase client until the
-row-and-object cutover. This is a storage boundary, not evidence of a completed
-production object transfer.
+Dashboard's storage administrator credential does not enter Atlas. The cutover
+copied and checksummed both graph objects and project-volume files into the
+graph-owned volume. The embedded compatibility package retains its optional
+Supabase client for rollback; original objects and volumes remain intact.
 
 Blob keys are relative, canonical paths. File operations use POSIX directory
 descriptors without following symlinks, reject special files and path escapes,
@@ -147,10 +150,12 @@ no longer resolve. Executable content retains sandbox and forced-download
 headers. Existing Supabase signed links remain served by their original private
 bucket until their compatibility window closes.
 
-The cutover must still copy and checksum both the object bucket and the project
+Future storage moves must copy and checksum both the object bucket and project
 filesystem, preserve referenced paths and active upload batches, rehearse new
-writes and reverse transfer, and switch exactly one writer. Creating a graph
-volume or passing these local tests does not satisfy those migration gates.
+writes and reverse transfer, and switch exactly one writer. Creating a volume
+or passing local tests alone does not satisfy those gates. Production copy
+manifests and the writer-control procedure belong to private Dashboard
+operations records, never this public repository.
 
 ## Gateway compatibility contracts
 
@@ -295,8 +300,8 @@ before starting it. Hosted credentials enter as deployment secrets, never
 image build arguments. `ATLAS_REQUIRE_POSTGRES=true` prevents an accidental
 fallback to a new SQLite database when the PostgreSQL secret is missing.
 
-`backend/fly.toml` targets the reserved `synsci-graphs` app in Singapore. Its
-initial state disables serving and indexing; the database health endpoint
+`backend/fly.toml` targets `synsci-graphs` in Singapore. A fresh deployment's
+default configuration disables serving and indexing; the database health endpoint
 still checks the real pool with a three-second deadline. HTTP graph operations
 return maintenance 503 and sockets close with 1013 until serving is enabled.
 The automatic indexer also stays stopped during maintenance. This prevents an
@@ -307,15 +312,16 @@ with one warm machine. The per-process graph pool is bounded by
 connection and command deadlines. Count every Dashboard, OAuth, worker, graph,
 and rollout process against the database's actual connection quota before
 provisioning. One process owns HTTP and the durable indexer in this initial
-layout. Scale and pricing still require the production migration gates.
+layout. Production serving and indexing were enabled only after the verified
+cutover. Capacity changes must retain database connection headroom.
 
 The graph configuration retains `thesis-synsc.fly.dev` as its public link
-origin. Its future compatibility proxy must remain in service for old links,
-clients, OAuth callbacks, and webhooks. The graph service's own deployment does
-not implement that legacy-host proxy or copy any data. Enable serving/indexing
-only after verified row/object transfer, account lifecycle/skill compatibility,
-writer fencing, reverse rollback, and provider readiness. No auto-deploy is
-configured for this runtime preparation.
+origin. Dashboard owns and deploys its compatibility proxy for old links,
+clients, OAuth callbacks and webhooks. A graph image deployment does not copy
+data or replace that proxy. For a new environment, enable serving/indexing only
+after verified row/object transfer, account lifecycle/skill compatibility,
+writer fencing, reverse rollback and provider readiness. Graph deployment
+remains an explicit operator action.
 
 The container rehearsal runs the actual Dashboard and graph images with a
 separate PostgreSQL graph login and a graph-owned volume. It verifies initial
