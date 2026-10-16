@@ -7,7 +7,7 @@ from __future__ import annotations
 import aiosqlite
 from fastapi import APIRouter, Depends, Path
 
-from atlas_graph.dependencies import get_current_user, get_db
+from atlas_graph.dependencies import get_people, get_current_user, get_db
 from atlas_graph.models.sharing import SetSharingBatchRequest, SetSharingRequest
 from atlas_graph.services import sharing_service
 from atlas_graph.services.sharing_service import CollaborationGatedError
@@ -31,11 +31,12 @@ from atlas_graph.routes._errors import service_error_to_http as _service_error_t
 @router.get("/api/sharing/{node_id}")
 async def get_sharing(
     node_id: str = Path(..., pattern=_NODE_ID_PATTERN),
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
     try:
-        return await sharing_service.get_sharing(db, user["user_id"], node_id)
+        return await sharing_service.get_sharing(db, user["user_id"], node_id, people=people)
     except (ValueError, CollaborationGatedError) as e:
         raise _service_error_to_http(e)
 
@@ -46,11 +47,12 @@ async def get_sharing(
 async def set_sharing(
     req: SetSharingRequest,
     node_id: str = Path(..., pattern=_NODE_ID_PATTERN),
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
     try:
-        return await sharing_service.set_sharing(db, user["user_id"], node_id, req)
+        return await sharing_service.set_sharing(db, user["user_id"], node_id, req, people=people)
     except (ValueError, CollaborationGatedError) as e:
         raise _service_error_to_http(e)
 
@@ -60,12 +62,13 @@ async def set_sharing(
 @router.post("/api/sharing/batch")
 async def set_sharing_batch(
     req: SetSharingBatchRequest,
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
     try:
         return await sharing_service.set_sharing_batch(
-            db, user["user_id"], req.node_ids, req
+            db, user["user_id"], req.node_ids, req, people=people
         )
     except (ValueError, CollaborationGatedError) as e:
         raise _service_error_to_http(e)

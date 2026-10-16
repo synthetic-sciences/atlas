@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 import hashlib
 import json
@@ -31,11 +32,68 @@ class Profile(BaseModel):
     avatar_url: StrictStr | None = None
     created_at: datetime
     updated_at: datetime
+    previous_user_ids: list[UUID] = Field(default_factory=list, max_length=64)
 
 
 class Account(BaseModel):
     identity: Identity
     profile: Profile
+
+
+class Person(Profile):
+    email: str = Field(strict=True, max_length=320)
+
+
+class PeopleResponse(BaseModel):
+    people: list[Person] = Field(max_length=100)
+
+
+class People:
+    def __init__(self, account: Dashboard, request: Request):
+        self.account = account
+        self.headers = account.headers(request)
+        self.profiles: dict[str, Person] = {}
+        self.resolved: dict[str, str | None] = {}
+        self.loaded: set[str] = set()
+
+    async def fetch(self, *, emails: Sequence[str] = (), ids: Sequence[str] = ()) -> None:
+        payload = await self.account.request(
+            "people", method="POST", headers=self.headers,
+            body={"emails": list(emails), "user_ids": list(ids)},
+        )
+        try:
+            parsed = PeopleResponse.model_validate(payload)
+        except ValidationError:
+            raise HTTPException(503, detail="Invalid account people response") from None
+        seen: set[str] = set()
+        for person in parsed.people:
+            uid = str(person.user_id)
+            aliases = {str(value) for value in person.previous_user_ids}
+            if uid in seen or (uid not in ids and not aliases.intersection(ids) and person.email.lower() not in emails):
+                raise HTTPException(503, detail="Invalid account people response")
+            seen.add(uid)
+            self.profiles[uid] = person
+            for alias in aliases.intersection(ids):
+                self.profiles[alias] = person
+            self.resolved[person.email.lower()] = uid
+        self.loaded.update(ids)
+        for email in emails:
+            self.resolved.setdefault(email, None)
+
+    async def resolve(self, db, emails: list[str]) -> dict[str, str | None]:
+        missing = list(dict.fromkeys(email.lower() for email in emails if email.lower() not in self.resolved))
+        for offset in range(0, len(missing), 100):
+            await self.fetch(emails=missing[offset:offset + 100])
+        for uid in {self.resolved[email.lower()] for email in emails} - {None}:
+            await Dashboard.cache_profile(db, self.profiles[uid])
+        await db.commit()
+        return {email: self.resolved[email.lower()] for email in emails}
+
+    async def emails(self, ids: list[str]) -> dict[str, str]:
+        missing = list(dict.fromkeys(uid for uid in ids if uid not in self.loaded and uid not in self.profiles))
+        for offset in range(0, len(missing), 100):
+            await self.fetch(ids=missing[offset:offset + 100])
+        return {uid: self.profiles[uid].email if uid in self.profiles else "" for uid in ids}
 
 
 class Collaboration(BaseModel):
@@ -273,6 +331,9 @@ class Dashboard:
     def query(self, request: Request) -> Query:
         return Query(self, request)
 
+    def people(self, request: Request) -> People:
+        return People(self, request)
+
     async def upload_ticket(self, ticket: str) -> dict:
         if len(ticket) > 16_384:
             raise HTTPException(403, detail="Invalid upload ticket")
@@ -371,8 +432,42 @@ class Dashboard:
 
     @staticmethod
     async def profile(db, account: Account) -> None:
-        user_id = str(account.identity.user_id)
-        profile = account.profile
+        await Dashboard.cache_profile(db, account.profile)
+        await db.commit()
+
+    @staticmethod
+    async def cache_profile(db, profile: Profile) -> None:
+        raw = getattr(db, "raw", None)
+        if raw is not None:
+            async with raw.transaction():
+                await db.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (str(profile.user_id),))
+                await Dashboard.write_profile(db, profile)
+            return
+        await db.execute("SAVEPOINT atlas_profile")
+        try:
+            await Dashboard.write_profile(db, profile)
+            await db.execute("RELEASE SAVEPOINT atlas_profile")
+        except BaseException:
+            await db.execute("ROLLBACK TO SAVEPOINT atlas_profile")
+            await db.execute("RELEASE SAVEPOINT atlas_profile")
+            raise
+
+    @staticmethod
+    async def write_profile(db, profile: Profile) -> None:
+        user_id = str(profile.user_id)
+        # Only the account authority can assert a rotation. Cascading the key
+        # preserves graph ownership and access without copying account history.
+        for previous in profile.previous_user_ids:
+            previous = str(previous)
+            if previous == user_id:
+                raise HTTPException(503, detail="Invalid account profile rotation")
+            cursor = await db.execute("SELECT user_id FROM users WHERE user_id = ?", (previous,))
+            if await cursor.fetchone() is None:
+                continue
+            cursor = await db.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+            if await cursor.fetchone() is not None:
+                raise HTTPException(503, detail="Graph account rotation requires reconciliation")
+            await db.execute("UPDATE users SET user_id = ? WHERE user_id = ?", (user_id, previous))
         await db.execute(
             "INSERT INTO users (user_id,email,display_name,github_username,avatar_url,created_at,updated_at) "
             "VALUES (?,?,?,?,?,?,?) ON CONFLICT (user_id) DO UPDATE SET "
@@ -388,7 +483,6 @@ class Dashboard:
                 profile.updated_at.isoformat(),
             ),
         )
-        await db.commit()
 
     async def optional_auth(self, request: Request) -> dict | None:
         return (

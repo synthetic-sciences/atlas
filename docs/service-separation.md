@@ -336,3 +336,29 @@ private database connection. The credential remains private to Dashboard and
 Atlas; the public gateway cannot reach these internal routes. Account policy
 callbacks use Dashboard's existing reserved control pool, so a busy primary
 pool cannot starve the callback needed to finish an authorized graph effect.
+
+## Sharing and project mounts
+
+Hosted sharing resolves explicit collaborator emails through Dashboard's bounded
+`/api/internal/atlas/people` operation, using both the account-service credential
+and the caller's current bearer and workspace. Graph ACL checks precede lookup.
+Account emails are request-local and never replace synthetic profile emails.
+Sharing policies bypass generic response replay, preserving current access checks
+and keeping email-bearing responses out of the graph idempotency cache. A failed
+account lookup leaves the existing sharing policy intact.
+
+Minimal profiles may include previous account IDs asserted by Dashboard's
+existing rotation audit. Atlas atomically cascades an unambiguous old profile ID
+to its current ID, preserving node IDs, revisions, and history. Conflicting
+profiles fail closed for reconciliation instead of merging or deleting graph
+records. Dashboard retains the audit, email, and account policy.
+
+The separately authenticated host administration interface supports scoped
+project mounts. Dashboard checks its active account and Atlas checks current
+project access for every read or mutation. Only `skills/` paths and the two
+host-managed files, `SKILL.md` and `skill.json`, may be written or removed.
+Operations use directory descriptors without following symlinks, enforce size
+limits, and preserve user-authored sibling files. The private skill catalog and
+installation records remain in Dashboard; these operations contain only files
+explicitly mounted by an authorized user. Dashboard's project installation IDs
+are external Atlas references rather than foreign keys to retained graph rows.

@@ -30,6 +30,8 @@ async def accounts(client, monkeypatch):
         "connected": True,
         "invalid_repository": False,
         "revoke_on_pin": False,
+        "people_broken": False,
+        "people_calls": [],
     }
     service = FastAPI()
 
@@ -76,6 +78,24 @@ async def accounts(client, monkeypatch):
         assert request.headers["x-atlas-service-token"] == token
         assert "authorization" not in request.headers
         return {"enabled": state["collaboration"], "label": "Account"}
+
+    @service.post("/api/internal/atlas/people")
+    async def people(request: Request):
+        await identity(request)
+        state["people_calls"].append(await request.json())
+        if state["people_broken"]:
+            return JSONResponse(status_code=503, content={"detail": "Private failure"})
+        body = await request.json()
+        return {"people": [{
+            "user_id": uid,
+            "email": email,
+            "display_name": label,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-02T00:00:00Z",
+        } for uid, email, label in [
+            (first, "owner@example.test", "Owner"),
+            (second, "guest@example.test", "Guest"),
+        ] if uid in body["user_ids"] or email in body["emails"]]}
 
     @service.post("/api/internal/atlas/repository")
     async def repository(request: Request):
@@ -127,6 +147,7 @@ async def accounts(client, monkeypatch):
             collaboration=remote.collaboration_allowed,
             collaboration_label=remote.collaboration_label,
             repository=remote.repository,
+            people=remote.people,
         )
     )
     try:
@@ -462,3 +483,73 @@ async def test_hosted_profile_reuses_the_database_already_bound_to_the_request(c
     async with get_db() as db:
         row = await (await db.execute("SELECT email FROM users WHERE user_id=?", (first,))).fetchone()
     assert row[0] == f"{first}@atlas.invalid"
+
+
+async def test_hosted_sharing_resolves_private_emails_without_storing_them(client, accounts):
+    state, _, first, second, workspace = accounts
+    headers = {"Authorization": "Bearer first", "X-Organization-ID": workspace}
+    created = await client.post("/api/v1/projects", json={"title": "Sharing"}, headers=headers)
+    node = created.json()["project_id"]
+    endpoint = f"/api/v1/nodes/{node}/access-policy"
+    response = await client.put(endpoint, headers=headers, json={"collaborators": [
+        {"email": "GUEST@example.test", "role": "editor"},
+        {"email": "unknown@example.test", "role": "viewer"},
+    ]})
+    assert response.status_code == 200, response.text
+    assert response.json()["owner_email"] == "owner@example.test"
+    assert response.json()["collaborators"] == [{"email": "guest@example.test", "role": "editor"}]
+    async with get_db() as db:
+        rows = await db.execute_fetchall("SELECT user_id,email FROM users")
+        assert {row["email"] for row in rows} == {f"{first}@atlas.invalid", f"{second}@atlas.invalid"}
+    guest = {"Authorization": "Bearer second"}
+    visible = await client.get(f"/api/sharing/{node}", headers=guest)
+    assert visible.status_code == 200, visible.text
+    assert visible.json()["effective"]["can_write"] is True
+    state["collaboration"] = False
+    reduced = await client.put(endpoint, headers=headers, json={"collaborators": [
+        {"email": "guest@example.test", "role": "viewer"},
+    ]})
+    assert reduced.status_code == 200, reduced.text
+    expanded = await client.put(endpoint, headers=headers, json={"collaborators": [
+        {"email": "guest@example.test", "role": "admin"},
+    ]})
+    assert expanded.status_code == 402
+    state["people_broken"] = True
+    failed = await client.put(endpoint, headers=headers, json={"collaborators": []})
+    assert failed.status_code == 503
+    assert "Private failure" not in failed.text
+    async with get_db() as db:
+        rows = await db.execute_fetchall("SELECT user_id,access_level FROM node_access_rules WHERE node_id=?", (node,))
+        assert [(row[0],row[1]) for row in rows] == [(second,"USER")]
+    state["people_broken"] = False
+    removed = await client.put(endpoint, headers=headers, json={"collaborators": []})
+    assert removed.status_code == 200, removed.text
+    calls = len(state["people_calls"])
+    assert (await client.get(endpoint, headers=guest)).status_code == 403
+    assert len(state["people_calls"]) == calls
+    state["revoked"] = True
+    assert (await client.get(endpoint, headers=headers)).status_code == 401
+    assert len(state["people_calls"]) == calls
+
+
+async def test_profile_rotation_preserves_graph_ownership_and_rejects_ambiguous_merge(client):
+    from atlas_graph.dependencies import LOCAL_USER_ID
+    from atlas_graph.integrations.dashboard import Profile
+    project = (await client.post("/api/v1/projects", json={"title": "Preserved rotation"})).json()["project_id"]
+    current = str(uuid4())
+    profile = Profile(user_id=current, previous_user_ids=[LOCAL_USER_ID], display_name="Rotated",
+        created_at="2026-01-01T00:00:00Z", updated_at="2026-01-02T00:00:00Z")
+    async with get_db() as db:
+        await Dashboard.cache_profile(db, profile)
+        await db.commit()
+        await Dashboard.cache_profile(db, profile)
+        await db.commit()
+        row = (await db.execute_fetchall("SELECT node_id,owner_user_id,title FROM nodes WHERE node_id=?", (project,)))[0]
+        assert tuple(row) == (project, current, "Preserved rotation")
+        assert (await db.execute_fetchall("SELECT email FROM users WHERE user_id=?", (current,)))[0][0] == f"{current}@atlas.invalid"
+        other = str(uuid4())
+        await Dashboard.cache_profile(db, profile.model_copy(update={"user_id": other, "previous_user_ids": []}))
+        await db.commit()
+        with pytest.raises(HTTPException, match="reconciliation"):
+            await Dashboard.cache_profile(db, profile.model_copy(update={"previous_user_ids": [other]}))
+        assert (await db.execute_fetchall("SELECT COUNT(*) FROM users"))[0][0] == 2

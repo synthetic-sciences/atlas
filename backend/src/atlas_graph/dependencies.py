@@ -65,6 +65,11 @@ async def optional_auth(request: Request) -> dict | None:
     return await get_current_user(request)
 
 
+def get_people(request: Request):
+    callback = host().people
+    return callback(request) if callback is not None else None
+
+
 async def get_db(request: Request):
     async with database() as db:
         request.state.atlas_database = db

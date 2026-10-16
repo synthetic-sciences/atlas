@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 from atlas_graph import config
 from atlas_graph.auth.access_check import require_node_access
-from atlas_graph.dependencies import get_current_user, get_db
+from atlas_graph.dependencies import get_people, get_current_user, get_db
 from atlas_graph.models.artifact import DeleteArtifactRequest, FinalizeUploadRequest, PrepareUploadRequest, SetArtifactNoteRequest
 from atlas_graph.models.node import AddParentRequest, BranchNodeRequest, CommitNodeRequest, MergeNodesRequest, RemoveParentRequest, StageNodeCreateRequest, StageNodeUpdateRequest
 from atlas_graph.models.sharing import SetSharingBatchRequest, SetSharingRequest
@@ -879,6 +879,7 @@ async def resolve_slug(
 @router.post("/nodes/access-policy/bulk")
 async def set_sharing_bulk(
     body: dict[str, Any] = Body(...),
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -892,7 +893,7 @@ async def set_sharing_bulk(
         )
         return {
             "items": await sharing_service.set_sharing_batch(
-                db, user["user_id"], node_ids, req
+                db, user["user_id"], node_ids, req, people=people
             )
         }
     except Exception as e:
@@ -902,12 +903,13 @@ async def set_sharing_bulk(
 @router.post("/nodes/access-policy/summaries")
 async def sharing_summaries(
     body: dict[str, Any] = Body(...),
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
     try:
         return await sharing_service.get_sharing_summaries(
-            db, user["user_id"], _split_ids(_body(body).get("node_ids"))
+            db, user["user_id"], _split_ids(_body(body).get("node_ids")), people=people
         )
     except Exception as e:
         raise _service_error_to_http(e)
@@ -1357,11 +1359,12 @@ async def node_files(
 @router.get("/nodes/{node_id}/access-policy")
 async def get_sharing(
     node_id: str,
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
     try:
-        return await sharing_service.get_sharing(db, user["user_id"], node_id)
+        return await sharing_service.get_sharing(db, user["user_id"], node_id, people=people)
     except Exception as e:
         raise _service_error_to_http(e)
 
@@ -1370,6 +1373,7 @@ async def get_sharing(
 async def set_sharing(
     node_id: str,
     body: dict[str, Any] = Body(...),
+    people=Depends(get_people),
     db: aiosqlite.Connection = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -1380,7 +1384,7 @@ async def set_sharing(
             sharing_mode=_coerce_sharing_mode(payload.get("sharing_mode")),
             collaborators=payload.get("collaborators"),
         )
-        return await sharing_service.set_sharing(db, user["user_id"], node_id, req)
+        return await sharing_service.set_sharing(db, user["user_id"], node_id, req, people=people)
     except Exception as e:
         raise _service_error_to_http(e)
 

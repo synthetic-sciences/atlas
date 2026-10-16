@@ -25,9 +25,9 @@ def path(value: str) -> str:
 
 
 @contextmanager
-def directory(value: str, *, create: bool = False):
+def directory(value: str, *, create: bool = False, root=None):
     parts = path(value).split("/")
-    root = config.BLOBS_DIR
+    root = config.BLOBS_DIR if root is None else root
     if create:
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
@@ -51,8 +51,8 @@ def directory(value: str, *, create: bool = False):
             os.close(descriptor)
 
 
-def upload(value: str, data: bytes) -> None:
-    with directory(value, create=True) as (parent, name):
+def upload(value: str, data: bytes, *, root=None) -> None:
+    with directory(value, create=True, root=root) as (parent, name):
         temporary = f".atlas-upload-{uuid4().hex}"
         try:
             descriptor = os.open(
@@ -74,20 +74,22 @@ def upload(value: str, data: bytes) -> None:
                 pass
 
 
-def download(value: str) -> bytes:
-    with directory(value) as (parent, name):
+def download(value: str, *, root=None, limit: int | None = None) -> bytes:
+    with directory(value, root=root) as (parent, name):
         descriptor = os.open(
             name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent
         )
         with os.fdopen(descriptor, "rb") as stream:
             if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
                 raise ValueError("Invalid artifact storage path")
-            return stream.read()
+            if limit is not None and os.fstat(stream.fileno()).st_size > limit:
+                raise ValueError("File exceeds the read limit")
+            return stream.read() if limit is None else stream.read(limit)
 
 
-def delete(value: str) -> None:
+def delete(value: str, *, root=None) -> None:
     try:
-        with directory(value) as (parent, name):
+        with directory(value, root=root) as (parent, name):
             os.unlink(name, dir_fd=parent)
     except FileNotFoundError:
         pass

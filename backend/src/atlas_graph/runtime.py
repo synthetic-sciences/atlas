@@ -18,6 +18,7 @@ class Host:
     github: Callable[[], object] | None = None
     repository: Callable[..., object] | None = None
     query: Callable[..., object] | None = None
+    people: Callable[..., object] | None = None
     upload_ticket: Callable[..., Awaitable[dict]] | None = None
     index: Callable[..., Awaitable[list[list[float]]]] | None = None
     embeddings: Callable[[], object] | None = None

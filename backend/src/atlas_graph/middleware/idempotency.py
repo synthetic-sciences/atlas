@@ -52,7 +52,7 @@ _STORABLE_NON_2XX_STATUSES = frozenset({409, 422})
 # mutable authorization. Replaying a stored approved response after revocation
 # would violate the access boundary (and could replay the private artifact URL).
 _AUTHORIZATION_SENSITIVE_PATHS = frozenset({"/api/ascent/access/request"})
-_AUTHORIZATION_SENSITIVE_PREFIXES = ("/api/admin/ascent/", "/api/internal/")
+_AUTHORIZATION_SENSITIVE_PREFIXES = ("/api/admin/ascent/", "/api/internal/", "/api/sharing/")
 
 # These routes authorize or report spend from a server-resolved Personal or
 # organization Wallet. Generic replay happens before route dependencies, so it
@@ -135,6 +135,11 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if request.url.path in _FUNDING_SENSITIVE_PATHS or request.url.path.startswith(
             _FUNDING_SENSITIVE_PREFIXES
         ):
+            return await call_next(request)
+
+        # Sharing always checks the current graph ACL and keeps account emails
+        # transient; replacement of its complete policy is already idempotent.
+        if "/access-policy" in request.url.path:
             return await call_next(request)
 
         idem_key = request.headers.get("Idempotency-Key")
