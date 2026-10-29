@@ -22,6 +22,7 @@ from typing import Any
 
 from atlas_graph import config
 from atlas_graph.auth.access_check import check_node_access, require_node_access
+from atlas_graph.db.transaction import transaction
 from atlas_graph.db.repos import node_repo, edge_repo, tag_repo, artifact_repo
 from atlas_graph.models.node import (
     BranchNodeRequest,
@@ -294,42 +295,43 @@ async def _full_node_response(db, node_id: str, user_id: str | None = None) -> d
 
 async def stage_create(db, user_id: str, req: StageNodeCreateRequest) -> dict:
     """Create a new staged node."""
-    node_id = str(uuid.uuid4())
-    slug = await generate_slug(db)
-    now = _now()
+    async with transaction(db) as connection:
+        for parent_id in req.parent_ids or []:
+            await require_node_access(connection, user_id, parent_id, "write")
+        node_id = str(uuid.uuid4())
+        slug = await generate_slug(connection)
+        now = _now()
 
-    node_data = {
-        "node_id": node_id,
-        "owner_user_id": user_id,
-        "slug_name": slug,
-        "title": req.title,
-        "summary": req.summary,
-        "content": req.content,
-        "node_type": req.kind.value if req.kind is not None else "untyped",
-        "lifecycle": "staged",
-        "outcome": None,
-        "hypothesis": req.hypothesis,
-        "no_artifacts_reason": None,
-        "insights": "[]",
-        "repo_url": req.repo_url,
-        "branch_name": req.branch_name,
-        "head_commit_sha": req.head_commit_sha,
-        "origin_host": req.origin_host,
-        "updated_by": req.updated_by,
-        "external_transcript_ref": req.external_transcript_ref,
-        "revision": 0,
-        "sharing_mode": "private",
-        "created_at": now,
-        "updated_at": now,
-    }
-    await node_repo.create_node(db, node_data)
+        node_data = {
+            "node_id": node_id,
+            "owner_user_id": user_id,
+            "slug_name": slug,
+            "title": req.title,
+            "summary": req.summary,
+            "content": req.content,
+            "node_type": req.kind.value if req.kind is not None else "untyped",
+            "lifecycle": "staged",
+            "outcome": None,
+            "hypothesis": req.hypothesis,
+            "no_artifacts_reason": None,
+            "insights": "[]",
+            "repo_url": req.repo_url,
+            "branch_name": req.branch_name,
+            "head_commit_sha": req.head_commit_sha,
+            "origin_host": req.origin_host,
+            "updated_by": req.updated_by,
+            "external_transcript_ref": req.external_transcript_ref,
+            "revision": 0,
+            "sharing_mode": "private",
+            "created_at": now,
+            "updated_at": now,
+        }
+        await node_repo.create_node(connection, node_data)
 
-    # Add edges for parent_ids
-    if req.parent_ids:
-        for pid in req.parent_ids:
-            await edge_repo.add_edge(db, pid, node_id, now)
-
-    await db.commit()
+        # Add edges for parent_ids
+        if req.parent_ids:
+            for pid in req.parent_ids:
+                await edge_repo.add_edge(connection, pid, node_id, now)
 
     result = await _full_node_response(db, node_id)
     try:
@@ -580,65 +582,67 @@ async def branch_node(db, user_id: str, req: BranchNodeRequest) -> dict:
     - Increment PARENT revision.
     - Child starts at revision 0, kind=untyped, lifecycle=staged.
     """
-    await require_node_access(db, user_id, req.node_id, "write")
+    async with transaction(db) as connection:
+        await require_node_access(connection, user_id, req.node_id, "write")
 
-    parent_row = await node_repo.get_node(db, req.node_id)
-    if parent_row is None:
-        raise ValueError(f"Node {req.node_id} not found")
-    if parent_row["revision"] != req.expected_revision:
-        raise ValueError(
-            f"409 conflict: expected revision {req.expected_revision}, "
-            f"current is {parent_row['revision']}"
-        )
+        parent_row = await node_repo.get_node(connection, req.node_id)
+        if parent_row is None:
+            raise ValueError(f"Node {req.node_id} not found")
+        if parent_row["revision"] != req.expected_revision:
+            raise ValueError(
+                f"409 conflict: expected revision {req.expected_revision}, "
+                f"current is {parent_row['revision']}"
+            )
 
-    # Increment parent revision
-    parent_new_revision = parent_row["revision"] + 1
-    now = _now()
-    await node_repo.update_node(db, req.node_id, {
-        "revision": parent_new_revision,
-        "updated_at": now,
-    })
+        # Increment parent revision
+        parent_new_revision = parent_row["revision"] + 1
+        now = _now()
+        updated = await node_repo.update_node(connection, req.node_id, {
+            "revision": parent_new_revision,
+            "updated_at": now,
+        }, expected_revision=req.expected_revision)
+        if updated is None:
+            raise ValueError("409 conflict: node was modified concurrently; refetch and retry")
 
-    # Create child node
-    child_id = str(uuid.uuid4())
-    slug = await generate_slug(db)
+        # Create child node
+        child_id = str(uuid.uuid4())
+        slug = await generate_slug(connection)
 
-    child_data = {
-        "node_id": child_id,
-        "owner_user_id": user_id,
-        "slug_name": slug,
-        "title": req.title,
-        "summary": parent_row.get("summary"),
-        "content": parent_row.get("content"),
-        "node_type": "untyped",
-        "lifecycle": "staged",
-        "outcome": None,
-        "hypothesis": None,
-        "no_artifacts_reason": None,
-        "insights": "[]",
-        "repo_url": parent_row.get("repo_url"),
-        "branch_name": parent_row.get("branch_name"),
-        "head_commit_sha": parent_row.get("head_commit_sha"),
-        "origin_host": parent_row.get("origin_host"),
-        "updated_by": user_id,
-        "external_transcript_ref": None,
-        "revision": 0,
-        "sharing_mode": parent_row.get("sharing_mode", "private"),
-        "created_at": now,
-        "updated_at": now,
-    }
-    await node_repo.create_node(db, child_data)
-    parent_semantics = parse_node_semantics(parent_row)
-    branch_semantics: dict[str, Any] = {
-        "type": "branch",
-        "branched_from_node_id": req.node_id,
-        "branched_from_revision": parent_row.get("revision"),
-    }
-    if isinstance(parent_semantics.get("code_state"), dict):
-        branch_semantics["code_state"] = parent_semantics["code_state"]
-    await node_repo.update_node(db, child_id, {"semantic_data": json.dumps(branch_semantics)})
-    await edge_repo.add_edge(db, req.node_id, child_id, now)
-    await db.commit()
+        child_data = {
+            "node_id": child_id,
+            "owner_user_id": user_id,
+            "slug_name": slug,
+            "title": req.title,
+            "summary": parent_row.get("summary"),
+            "content": parent_row.get("content"),
+            "node_type": "untyped",
+            "lifecycle": "staged",
+            "outcome": None,
+            "hypothesis": None,
+            "no_artifacts_reason": None,
+            "insights": "[]",
+            "repo_url": parent_row.get("repo_url"),
+            "branch_name": parent_row.get("branch_name"),
+            "head_commit_sha": parent_row.get("head_commit_sha"),
+            "origin_host": parent_row.get("origin_host"),
+            "updated_by": user_id,
+            "external_transcript_ref": None,
+            "revision": 0,
+            "sharing_mode": parent_row.get("sharing_mode", "private"),
+            "created_at": now,
+            "updated_at": now,
+        }
+        await node_repo.create_node(connection, child_data)
+        parent_semantics = parse_node_semantics(parent_row)
+        branch_semantics: dict[str, Any] = {
+            "type": "branch",
+            "branched_from_node_id": req.node_id,
+            "branched_from_revision": parent_row.get("revision"),
+        }
+        if isinstance(parent_semantics.get("code_state"), dict):
+            branch_semantics["code_state"] = parent_semantics["code_state"]
+        await node_repo.update_node(connection, child_id, {"semantic_data": json.dumps(branch_semantics)})
+        await edge_repo.add_edge(connection, req.node_id, child_id, now)
 
     child_resp = await _full_node_response(db, child_id)
     try:

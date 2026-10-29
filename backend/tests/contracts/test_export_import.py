@@ -37,7 +37,7 @@ async def test_export_uses_api_names(client, auth_headers):
     assert export_resp.status_code == 200
     data = export_resp.json()
 
-    assert data["version"] == 1
+    assert data["version"] == 2
     assert data["node_count"] >= 2
 
     # Check that export uses stable interchange field names.
