@@ -131,6 +131,8 @@ docs/       Architecture, development, and release records
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks,
 [architecture](docs/architecture.md) for the boundaries, and
 [server configuration](docs/development.md) for local and hosted settings.
+[Graph integrity](docs/graph-integrity.md) covers concurrent mutations,
+idempotent retries, and portable exports with evidence.
 [AGENTS.md](AGENTS.md) records repository conventions. Pull requests are squash
 merged after their required checks pass.
 

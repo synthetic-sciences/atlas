@@ -15,11 +15,11 @@ header.  Behaviour:
 3. If the scoped key already exists *and* the ``request_hash`` matches →
    replay the stored response (status + body).
 4. If the scoped key exists but the ``request_hash`` differs → ``409``.
-5. If the key is new → let the request through, capture the response, and
-   persist it with a 7-day TTL (``config.IDEMPOTENCY_TTL_DAYS``) - but only
-   when the outcome is deterministic (2xx, 409, 422). 401/403/429/5xx are
-   never stored, so a client that correctly reuses its key on retry can
-   still succeed once the transient condition clears.
+5. Atomically claim new keys before dispatch; concurrent calls cannot run the
+   mutation again. Capture deterministic responses (2xx, 409, 422) with a
+   7-day TTL (``config.IDEMPOTENCY_TTL_DAYS``). Authorization/throttling
+   rejections release the claim. Interrupted and 5xx outcomes retain it
+   because the mutation may already have committed.
 
 Requests without the header, and safe methods (GET, HEAD, OPTIONS), are
 passed through unchanged.
@@ -43,9 +43,8 @@ logger = logging.getLogger(__name__)
 _MUTATION_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 
 # Only outcomes that are a deterministic function of the request are worth
-# replaying. 401/403 reflect mutable auth state, 408/429 and 5xx are
-# transient - storing any of those would pin the client's retry to the
-# failure for IDEMPOTENCY_TTL_DAYS.
+# replaying. Authorization/throttling rejections can release the claim;
+# ambiguous failures keep it to prevent a second mutation.
 _STORABLE_NON_2XX_STATUSES = frozenset({409, 422})
 
 # These endpoints are intrinsically idempotent but their response reflects
@@ -142,6 +141,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         if "/access-policy" in request.url.path:
             return await call_next(request)
 
+        if request.url.path.startswith(("/api/export/", "/api/v1/export")):
+            return await call_next(request)
+
         idem_key = request.headers.get("Idempotency-Key")
         if not idem_key:
             return await call_next(request)
@@ -154,90 +156,112 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         storage_key = _storage_key(user_id, request.method, request.url.path, idem_key)
 
+        maximum_body = config.IDEMPOTENCY_MAX_BODY_BYTES
+        if request.url.path in {"/api/import/subgraph", "/api/v1/import"}:
+            from atlas_graph.services.export_import_service import MAX_ARCHIVE_REQUEST_BYTES
+
+            maximum_body = MAX_ARCHIVE_REQUEST_BYTES
         content_length = _parse_content_length(request.headers.get("Content-Length"))
-        if content_length and content_length > config.IDEMPOTENCY_MAX_BODY_BYTES:
+        if content_length and content_length > maximum_body:
             return _too_large_response("Idempotent request body is too large")
 
         # Read the body and compute its hash.  We cache the body on the
         # request state so downstream handlers can still read it.
         body_bytes = await request.body()
-        if len(body_bytes) > config.IDEMPOTENCY_MAX_BODY_BYTES:
+        if len(body_bytes) > maximum_body:
             return _too_large_response("Idempotent request body is too large")
         request_hash = hashlib.sha256(body_bytes).hexdigest()
 
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(days=config.IDEMPOTENCY_TTL_DAYS)
         async with get_db() as db:
-            rows = await db.execute_fetchall(
-                "SELECT request_hash, response_body, status_code, expires_at "
-                "FROM idempotency_keys WHERE idempotency_key = ?",
-                (storage_key,),
+            claimed = await db.execute(
+                "INSERT INTO idempotency_keys "
+                "(idempotency_key, request_hash, response_body, status_code, created_at, expires_at) "
+                "VALUES (?, ?, NULL, NULL, ?, ?) "
+                "ON CONFLICT (idempotency_key) DO UPDATE SET "
+                "request_hash = excluded.request_hash, response_body = NULL, status_code = NULL, "
+                "created_at = excluded.created_at, expires_at = excluded.expires_at "
+                "WHERE idempotency_keys.expires_at <= ? AND idempotency_keys.status_code IS NOT NULL",
+                (storage_key, request_hash, now.isoformat(), expires_at.isoformat(), now.isoformat()),
             )
-
-            if rows:
-                existing = rows[0]
-                now_iso = datetime.now(UTC).isoformat()
-
-                # Expired entries are treated as non-existent
-                if existing["expires_at"] and existing["expires_at"] > now_iso:
-                    if existing["request_hash"] != request_hash:
-                        return Response(
-                            content='{"detail":"Idempotency-Key reused with different request body"}',
-                            status_code=409,
-                            media_type="application/json",
-                        )
-
-                    # Replay the stored response
+            await db.commit()
+            if claimed.rowcount == 0:
+                rows = await db.execute_fetchall(
+                    "SELECT request_hash, response_body, status_code FROM idempotency_keys "
+                    "WHERE idempotency_key = ?",
+                    (storage_key,),
+                )
+                if not rows:
                     return Response(
-                        content=existing["response_body"],
-                        status_code=existing["status_code"],
-                        media_type="application/json",
+                        content='{"detail":"Idempotency-Key is being released; retry the same request"}',
+                        status_code=409, media_type="application/json", headers={"Retry-After": "1"},
                     )
+                existing = rows[0]
+                if existing["request_hash"] != request_hash:
+                    return Response(
+                        content='{"detail":"Idempotency-Key reused with different request body"}',
+                        status_code=409, media_type="application/json",
+                    )
+                if existing["status_code"] is None:
+                    # An interrupted request may already have committed its
+                    # effect. Never expire an unfinished claim into a retry.
+                    return Response(
+                        content='{"detail":"Idempotency-Key is in progress or its outcome is unknown"}',
+                        status_code=409, media_type="application/json", headers={"Retry-After": "1"},
+                    )
+                return Response(
+                    content=existing["response_body"], status_code=existing["status_code"],
+                    media_type="application/json",
+                )
 
-        # Key doesn't exist (or was expired) - process the request normally
+        # The durable claim survives cancellation and an ambiguous server error.
         response = await call_next(request)
+
+        # Authorization and throttling rejections occur before graph work and
+        # can be retried after the caller's state changes. Keep ambiguous 5xx
+        # outcomes claimed because graph helpers may already have committed.
+        if response.status_code in {401, 403, 404, 405, 408, 429}:
+            async with get_db() as db:
+                await db.execute(
+                    "DELETE FROM idempotency_keys WHERE idempotency_key = ? AND status_code IS NULL",
+                    (storage_key,),
+                )
+                await db.commit()
+            return response
+        if not _should_store_status(response.status_code):
+            return response
 
         content_type = response.headers.get("content-type", "")
         response_len = _parse_content_length(response.headers.get("content-length"))
-        if "application/json" not in content_type:
-            return response
-        if response_len is None:
-            return response
-        if response_len > config.IDEMPOTENCY_MAX_RESPONSE_BYTES:
-            return response
-
-        # Read the full response body so we can store it
-        response_body_parts: list[bytes] = []
-        async for chunk in response.body_iterator:  # type: ignore[union-attr]
-            if isinstance(chunk, str):
-                response_body_parts.append(chunk.encode("utf-8"))
-            else:
-                response_body_parts.append(chunk)
-        response_body = b"".join(response_body_parts)
-
-        should_store = (
-            len(response_body) <= config.IDEMPOTENCY_MAX_RESPONSE_BYTES
-            and _should_store_status(response.status_code)
-        )
-
-        now = datetime.now(UTC)
-        expires_at = now + timedelta(days=config.IDEMPOTENCY_TTL_DAYS)
-
-        if should_store:
+        if "application/json" not in content_type or response_len is None or response_len > config.IDEMPOTENCY_MAX_RESPONSE_BYTES:
+            # We cannot replay this body, but a successful mutation must not be
+            # dispatched again merely because its response is large or binary.
             async with get_db() as db:
                 await db.execute(
-                    "INSERT OR REPLACE INTO idempotency_keys "
-                    "(idempotency_key, request_hash, response_body, status_code, "
-                    " created_at, expires_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        storage_key,
-                        request_hash,
-                        response_body.decode("utf-8", errors="replace"),
-                        response.status_code,
-                        now.isoformat(),
-                        expires_at.isoformat(),
-                    ),
+                    "UPDATE idempotency_keys SET response_body = ?, status_code = 409 "
+                    "WHERE idempotency_key = ? AND status_code IS NULL",
+                    ('{"detail":"Request completed but its response cannot be replayed; read the resulting resource"}', storage_key),
                 )
                 await db.commit()
+            return response
+
+        response_body_parts: list[bytes] = []
+        async for chunk in response.body_iterator:  # type: ignore[union-attr]
+            response_body_parts.append(chunk.encode("utf-8") if isinstance(chunk, str) else chunk)
+        response_body = b"".join(response_body_parts)
+        replayable = len(response_body) <= config.IDEMPOTENCY_MAX_RESPONSE_BYTES
+        stored_body = (
+            response_body.decode("utf-8", errors="replace") if replayable else
+            '{"detail":"Request completed but its response cannot be replayed; read the resulting resource"}'
+        )
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE idempotency_keys SET response_body = ?, status_code = ? "
+                "WHERE idempotency_key = ? AND status_code IS NULL",
+                (stored_body, response.status_code if replayable else 409, storage_key),
+            )
+            await db.commit()
 
         # Return a new Response with the same body/status/headers
         return Response(
